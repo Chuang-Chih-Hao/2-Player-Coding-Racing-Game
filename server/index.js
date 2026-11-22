@@ -147,6 +147,7 @@ export function createGameServer(options={}) {
     socket.on("teacher:set",(data={},ack)=>{
       const room=inside(socket,ack,"teacher");if(!room)return;
       if(!["tuning","results"].includes(room.phase))return error(ack,"比賽進行時不能變更課程設定");
+      const topicChanged=data.topic!==undefined && data.topic!==room.topic;
       if(data.topic!==undefined) {
         if(!Object.hasOwn(TOPICS,data.topic))return error(ack,"未知課程主題");
         room.topic=data.topic;
@@ -163,7 +164,7 @@ export function createGameServer(options={}) {
         if(!Number.isInteger(data.difficulty)||data.difficulty<1||data.difficulty>3)return error(ack,"難度只能是 1～3");
         room.difficulty=data.difficulty;
       }
-      if(data.topic!==undefined) {
+      if(topicChanged) {
         room.students.forEach(s=>{if(s){s.locked=false;s.ready=false;s.draft=defaultProgram();s.program=defaultProgram();s.version++;if(s.socketId)io.to(s.socketId).emit("program:replace",{program:s.draft,reason:"老師已切換主題，載入預設積木"});}});
       }
       room.version++;okay(ack,{room:view(room,true)});notify(io,room);
@@ -276,7 +277,7 @@ export function createGameServer(options={}) {
       const candidate=clone(s.draft);
       let done=false;
       function edit(arr){for(const n of arr){if(n.type==="action"&&n.op===data.op&&!done){n.value=value;done=true;}if(n.type==="if"){edit(n.then);edit(n.else);}}}
-      candidate.forEach(e=>edit(e.body));
+      candidate.filter(e=>room.topic==="curve"?e.event==="curve_enter":room.topic==="item"?["pickup","key"].includes(e.event):true).forEach(e=>edit(e.body));
       if(!done)return error(ack,"學生尚未放置這個數值積木");
       try{s.draft=validateProgram(candidate,room.topic);s.locked=false;s.ready=false;
         s.version++;s.modified=calculateModified(s.draft);
@@ -348,7 +349,7 @@ export function createGameServer(options={}) {
         room.elapsed+=(dt);
         const track=makeTrack(room.track);
         for(const c of room.cars){
-          stepCar(c,track,dt,now,entry=>trace(room,c,entry));
+          stepCar(c,track,dt,now,entry=>trace(room,c,entry),room.difficulty);
           finishIfNeeded(c,room.laps,room.elapsed,now,entry=>trace(room,c,entry));
         }
         if(room.cars.length&& (room.cars.every(c=>c.finished)||room.elapsed>200))finish(room);
@@ -357,7 +358,7 @@ export function createGameServer(options={}) {
         const track=makeTrack(room.track);
         room.students.forEach(s=>{
           if(!s?.practice)return;
-          stepCar(s.practice,track,dt,now,entry=>trace(room,s.practice,entry));
+          stepCar(s.practice,track,dt,now,entry=>trace(room,s.practice,entry),room.difficulty);
           if(ticks%3===0 && s.socketId)io.to(s.socketId).emit("practice:update",simpleCar(s.practice));
         });
       }

@@ -206,7 +206,7 @@ export function execute(c,event,ctx={},now=Date.now(),emit=()=>{}) {
     c.events++;log(evt,"事件觸發：" + event);act(evt.body);
   }
 }
-export function stepCar(c,track,dt,now,emit=()=>{}) {
+export function stepCar(c,track,dt,now,emit=()=>{},difficulty=2) {
   if(c.finished)return;
   const near0=nearest(track,c.x,c.y);
   const nearObstacle=Math.min(...track.obstacles.map(o=>Math.hypot(o.x-c.x,o.y-c.y)),999);
@@ -226,7 +226,7 @@ export function stepCar(c,track,dt,now,emit=()=>{}) {
   const near=nearest(track,c.x,c.y);
   c.progress=near.idx;
   c.offroad=near.distance>track.width/2;
-  if(c.offroad)c.speed=Math.max(0,c.speed-(gripped?20:82)*dt);
+  if(c.offroad)c.speed=Math.max(0,c.speed-(gripped?20:difficulty===1?55:difficulty===3?110:82)*dt);
   const curve=isCurve(track,near.idx);
   if(curve!==c.curve) {
     c.curve=curve;execute(c,curve?"curve_enter":"curve_leave",{obstacleDistance:nearObstacle},now,emit);
@@ -236,7 +236,7 @@ export function stepCar(c,track,dt,now,emit=()=>{}) {
     const o=track.obstacles[i];
     if(Math.hypot(c.x-o.x,c.y-o.y)<o.r+10 && now-c.lastHit>1700) {
       c.lastHit=now;
-      if(c.shieldUntil<=now){c.speed*=.24;c.collisions++;c.lastDiagnostic="撞到障礙物！可使用條件判斷或防護盾";}
+      if(c.shieldUntil<=now){c.speed*=difficulty===1?.35:difficulty===3?.16:.24;c.collisions++;c.lastDiagnostic="撞到障礙物！可使用條件判斷或防護盾";}
       execute(c,"collision",{collision:true},now,emit);
     }
   }

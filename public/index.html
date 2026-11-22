@@ -1,0 +1,128 @@
+<!doctype html>
+<html lang="zh-Hant">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no">
+  <title>雙人程式賽車：極速工程師</title>
+  <link rel="stylesheet" href="/style.css">
+</head>
+<body>
+  <div id="shell">
+    <div id="stage">
+      <header>
+        <div class="brand"><span class="logo">🏎️</span><div><strong>極速工程師</strong><small>雙人 Scratch 程式賽車 · Coding Racing Lab</small></div></div>
+        <div class="header-info"><span id="roomBadge">尚未加入房間</span><span id="phaseBadge">課程準備中</span><span id="statusOnline" class="led">● 已連線</span></div>
+      </header>
+      <section id="home" class="home">
+        <div class="intro">
+          <div class="eyebrow">LEARN · CODE · RACE</div>
+          <h1>讓程式，<em>決定你的極速。</em></h1>
+          <p>使用像 Scratch 一樣的積木調校賽車，學習變數、if / else 與事件。兩位學生、三台電腦，同步競速。</p>
+          <div class="feature-strip"><span>🧩 拖曳積木</span><span>🏁 即時競速</span><span>👨‍🏫 教師監控</span></div>
+          <div class="demo-track"><div class="oval"><i class="car-a">◆</i><i class="car-b">◆</i></div></div>
+        </div>
+        <div class="login-card">
+          <div class="step">01 / SELECT YOUR ROLE</div>
+          <h2>進入賽車教室</h2>
+          <div class="login-switch"><button id="roleStudent" class="active">我是學生</button><button id="roleTeacher">我是老師</button></div>
+          <div id="studentForm">
+            <label>你的暱稱<input id="studentName" maxlength="16" placeholder="例如：閃電小子"></label>
+            <label>房間代碼<input id="roomCodeInput" maxlength="6" placeholder="輸入六碼代碼" autocapitalize="characters"></label>
+            <button id="joinButton" class="primary big">加入雙人賽車教室</button>
+          </div>
+          <div id="teacherForm" hidden>
+            <p class="muted">建立專屬課堂，系統將產生房間代碼，請分享給兩位學生。</p>
+            <button id="createButton" class="primary big">建立教師房間</button>
+          </div>
+          <p id="loginError" class="error"></p>
+        </div>
+      </section>
+      <main id="game" hidden>
+        <section id="trackPanel">
+          <div class="panel-head">
+            <div><span class="micro">LIVE CIRCUIT</span><strong id="trackTitle">新手練習賽道</strong></div>
+            <div id="raceClock">00:00.0</div>
+          </div>
+          <div id="trackCanvasHolder">
+            <canvas id="raceCanvas" width="1000" height="686"></canvas>
+            <div class="countdown" id="countdown" hidden>3</div>
+            <div id="raceOverlay" class="race-overlay" hidden></div>
+            <div class="race-hud">
+              <div class="hud-pill"><small>圈數</small><b id="lapDisplay">—</b></div>
+              <div class="hud-pill"><small>目前速度</small><b id="speedDisplay">0</b><small>km/h</small></div>
+              <div class="hud-pill"><small>道具</small><b id="itemDisplay">—</b></div>
+              <div class="hud-pill"><small>排名</small><b id="rankDisplay">—</b></div>
+            </div>
+          </div>
+          <div id="trackFooter">
+            <div class="pilot-card"><span class="pilot-dot blue"></span><div><strong id="name1">等待學生 A</strong><small id="meta1">未進入</small></div></div>
+            <div class="pilot-card"><span class="pilot-dot pink"></span><div><strong id="name2">等待學生 B</strong><small id="meta2">未進入</small></div></div>
+            <div class="driver-key" id="driverHint">駕駛：方向鍵 / WASD · 空白鍵：使用道具</div>
+          </div>
+        </section>
+        <aside id="rightPanel">
+          <div id="studentPanel" hidden>
+            <div class="side-title"><div><span class="micro">SCRATCH CODING GARAGE</span><h2>賽車程式調校站</h2></div><span id="missionTag" class="chip">變數任務</span></div>
+            <p class="mission" id="missionDescription">修改最高速度，看看車輛表現如何改變。</p>
+            <div class="editor-toolbar">
+              <button id="undoButton" title="復原">↶ 復原</button><button id="redoButton" title="重做">↷ 重做</button>
+              <button id="resetButton">恢復預設</button><button id="clearButton">清空</button>
+              <button id="saveButton">儲存</button>
+            </div>
+            <div id="blocklyDiv"></div>
+            <div class="student-actions">
+              <button id="testButton" class="secondary">▶ 練習測試</button>
+              <button id="stopTestButton" class="secondary" hidden>■ 停止測試</button>
+              <button id="lockButton" class="primary">✓ 鎖定積木 / 準備</button>
+              <button id="unlockButton" class="secondary" hidden>修改積木</button>
+              <button id="helpButton" class="warning">? 請老師協助</button>
+            </div>
+            <div class="console"><span class="console-title">🧠 程式執行觀察</span><div id="codeFeedback">拖曳積木、修改數值，然後開始測試。</div></div>
+          </div>
+          <div id="teacherPanel" hidden>
+            <div class="side-title"><div><span class="micro">TEACHER CONTROL DECK</span><h2>教師控制台</h2></div><span class="chip">HOST</span></div>
+            <div class="teacher-scroll">
+              <div class="info-banner">房間代碼 <strong id="teacherCode">------</strong><button id="copyInvite">複製邀請網址</button></div>
+              <div class="section-caption">回合設定</div>
+              <div class="config-grid">
+                <label>學習主題<select id="topicSelect"><option value="max">01 · 最高速度</option><option value="accel">02 · 加速度</option><option value="curve">03 · if / else 彎道</option><option value="item">04 · 道具事件</option><option value="free">05 · 自由挑戰</option></select></label>
+                <label>賽道<select id="trackSelect"><option value="rookie">新手練習</option><option value="curves">彎道技術</option><option value="items">道具競速</option></select></label>
+                <label>比賽圈數<select id="lapsSelect"><option value="1">1 圈</option><option value="2" selected>2 圈</option><option value="3">3 圈</option><option value="4">4 圈</option><option value="5">5 圈</option></select></label>
+                <label>難度<select id="difficultySelect"><option value="1">入門</option><option value="2">標準</option><option value="3">挑戰</option></select></label>
+              </div>
+              <button id="applySettings" class="secondary full">套用本回合設定</button>
+              <div class="section-caption">比賽管理</div>
+              <div class="control-grid">
+                <button id="startRace" class="primary">🏁 開始倒數競速</button><button id="pauseRace" class="secondary">Ⅱ 暫停</button>
+                <button id="resumeRace" class="secondary">▶ 繼續</button><button id="restartRace" class="secondary">↻ 新回合</button>
+                <button id="finishRace" class="secondary">結束本場</button><button id="rescueCar" class="secondary">救援選中車輛</button>
+              </div>
+              <div class="section-caption">兩位學生的積木 / 學習狀態</div>
+              <div class="student-tabs"><button id="selectP1" class="active">A · 學生一</button><button id="selectP2">B · 學生二</button></div>
+              <div id="studentDetails" class="inspector-text">等待學生加入...</div>
+              <div id="teacherBlockly"></div>
+              <div class="teacher-help">
+                <div class="two-col"><label>協助調整積木<select id="assistOp"><option value="set_max">最高速度</option><option value="set_accel">加速度</option><option value="set_target">目標速度</option><option value="set_steer">轉向靈敏度</option><option value="set_brake">煞車強度</option></select></label>
+                <label>設定值<input id="assistValue" type="number" value="150"></label></div>
+                <button id="assistApply" class="secondary">同步修改學生積木</button>
+                <div class="two-col"><button id="teacherReset" class="secondary">恢復學生預設</button><button id="teacherStopTest" class="secondary">停止學生測試</button></div>
+                <label>傳送提示<input id="teacherHint" placeholder="例如：試著將彎道速度設低一點"></label>
+                <button id="sendHint" class="primary full">傳送給選中的學生</button>
+              </div>
+              <div class="section-caption">近期訊息與學習紀錄</div>
+              <div id="teacherMessages" class="teacher-messages"></div>
+              <div id="report" class="report"></div>
+            </div>
+          </div>
+        </aside>
+      </main>
+      <div id="toast" role="status"></div>
+    </div>
+  </div>
+  <script src="/socket.io/socket.io.js"></script>
+  <script src="/vendor/blockly/blockly_compressed.js"></script>
+  <script src="/vendor/blockly/blocks_compressed.js"></script>
+  <script src="/vendor/blockly/msg/zh-hant.js"></script>
+  <script type="module" src="/app.js"></script>
+</body>
+</html>

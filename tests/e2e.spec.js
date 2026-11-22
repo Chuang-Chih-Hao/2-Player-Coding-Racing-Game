@@ -1,0 +1,80 @@
+import {test,expect} from "@playwright/test";
+test("three actual browser sessions: visual blocks, teacher monitoring, synchronized race, rejoin and scaling",async({browser})=>{
+ const teacher=await browser.newContext({viewport:{width:1600,height:900}});
+ const s1=await browser.newContext({viewport:{width:1280,height:720}});
+ const s2=await browser.newContext({viewport:{width:1024,height:768}});
+ const t=await teacher.newPage(),a=await s1.newPage(),b=await s2.newPage();
+ await t.goto("/");
+ await t.locator("#roleTeacher").click();
+ await t.locator("#createButton").click();
+ const code=(await t.locator("#teacherCode").innerText()).trim();
+ expect(code).toMatch(/^[A-F0-9]{6}$/);
+ for(const [p,name]of [[a,"A 車手"],[b,"B 車手"]]){
+  await p.goto("/?room="+code);
+  await p.locator("#studentName").fill(name);
+  await p.locator("#joinButton").click();
+  await expect(p.locator("#blocklyDiv .blocklySvg")).toBeVisible();
+ }
+ await expect(t.locator("#name1")).toContainText("A 車手");
+ await expect(t.locator("#name2")).toContainText("B 車手");
+ await t.locator("#topicSelect").selectOption("free");
+ await t.locator("#applySettings").click();
+ await expect(a.locator("#missionTag")).toHaveText("自由設計");
+ const blockCount=await a.evaluate(()=>Blockly.getMainWorkspace().getAllBlocks(false).length);
+ expect(blockCount).toBeGreaterThan(10);
+ await a.evaluate(()=>{
+  const w=Blockly.getMainWorkspace(),block=w.getAllBlocks(false).find(b=>b.type==="act_set_max");
+  block.setFieldValue("198","VALUE");
+ });
+ await expect(t.locator("#studentDetails")).toContainText("最高速度");
+ const scaled=await a.evaluate(()=>{
+  const stage=document.querySelector("#stage").getBoundingClientRect();
+  const left=document.querySelector("#trackPanel").getBoundingClientRect();
+  const right=document.querySelector("#rightPanel").getBoundingClientRect();
+  return {width:stage.width,leftY:left.y,rightY:right.y,rightX:right.x,screen:innerWidth};
+ });
+ expect(Math.abs(scaled.width-scaled.screen)).toBeLessThan(3);
+ expect(Math.abs(scaled.leftY-scaled.rightY)).toBeLessThan(2);
+ expect(scaled.rightX).toBeLessThan(scaled.screen);
+ // Blockly must remain a functional editor at non-native zoom.
+ await a.locator("#blocklyDiv .blocklyToolboxCategory").filter({hasText:"變數"}).first().click();
+ await expect(a.locator("#blocklyDiv .blocklyFlyout")).toBeVisible();
+ const fly=a.locator("#blocklyDiv .blocklyFlyout .blocklyDraggable").first();
+ await expect(fly).toBeVisible();
+ const src=await fly.boundingBox(),target=await a.locator("#blocklyDiv").boundingBox();
+ await a.mouse.move(src.x+src.width/2,src.y+src.height/2);
+ await a.mouse.down();
+ await a.mouse.move(target.x+target.width*.73,target.y+target.height*.41,{steps:15});
+ await a.mouse.up();
+ expect(await a.evaluate(()=>Blockly.getMainWorkspace().getAllBlocks(false).length)).toBeGreaterThanOrEqual(blockCount);
+ // A loose block must be connected or deleted before committing. Restore defaults and adjust the one target.
+ await a.locator("#resetButton").click();
+ await a.evaluate(()=>Blockly.getMainWorkspace().getAllBlocks(false).find(b=>b.type==="act_set_max").setFieldValue("198","VALUE"));
+ await a.locator("#lockButton").click();
+ await b.locator("#lockButton").click();
+ await expect(t.locator("#startRace")).toBeEnabled();
+ await t.locator("#startRace").click();
+ await expect(t.locator("#phaseBadge")).toContainText("倒數");
+ await expect(t.locator("#phaseBadge")).toContainText("正式比賽",{timeout:8000});
+ await a.keyboard.down("ArrowUp");
+ await b.keyboard.down("ArrowUp");
+ await expect.poll(async()=>Number((await a.locator("#speedDisplay").innerText()).trim())).toBeGreaterThan(0);
+ await expect.poll(async()=>Number((await b.locator("#speedDisplay").innerText()).trim())).toBeGreaterThan(0);
+ await a.keyboard.up("ArrowUp");await b.keyboard.up("ArrowUp");
+ await t.locator("#pauseRace").click();
+ await expect(t.locator("#phaseBadge")).toContainText("暫停");
+ await t.locator("#resumeRace").click();
+ await t.locator("#finishRace").click();
+ await expect(t.locator("#report")).toContainText("第 1 回合");
+ await t.locator("#restartRace").click();
+ await a.reload();
+ await expect(a.locator("#roomBadge")).toContainText(code);
+ await t.locator("#assistOp").selectOption("set_max");
+ await t.locator("#assistValue").fill("170");
+ await t.locator("#assistApply").click();
+ await expect.poll(()=>a.evaluate(()=>Number(Blockly.getMainWorkspace().getAllBlocks(false).find(b=>b.type==="act_set_max").getFieldValue("VALUE")))).toBe(170);
+ await t.locator("#teacherHint").fill("請觀察最大速度和加速度的差異");
+ await t.locator("#sendHint").click();
+ await expect(a.locator("#codeFeedback")).toContainText("老師提示");
+ await teacher.close();await s1.close();await s2.close();
+});

@@ -38,8 +38,9 @@ test("three actual browser sessions: visual blocks, teacher monitoring, synchron
  expect(scaled.rightX).toBeLessThan(scaled.screen);
  // Blockly must remain a functional editor at non-native zoom.
  await a.locator("#blocklyDiv .blocklyToolboxCategory").filter({hasText:"變數"}).first().click();
- await expect(a.locator("#blocklyDiv .blocklyFlyout")).toBeVisible();
- const fly=a.locator("#blocklyDiv .blocklyFlyout .blocklyDraggable").first();
+ const visibleFlyout=a.locator("#blocklyDiv .blocklyFlyout").last();
+ await expect(visibleFlyout).toBeVisible();
+ const fly=visibleFlyout.locator(".blocklyDraggable").first();
  await expect(fly).toBeVisible();
  const src=await fly.boundingBox(),target=await a.locator("#blocklyDiv").boundingBox();
  await a.mouse.move(src.x+src.width/2,src.y+src.height/2);

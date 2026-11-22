@@ -16,6 +16,18 @@ jobs:
       - run: npm test
       - run: npx playwright install --with-deps chromium
       - run: npm run test:e2e
+      - name: Verify Render public health endpoint
+        if: github.event_name == 'push'
+        run: |
+          for i in $(seq 1 20); do
+            if curl --fail --silent --show-error --max-time 12 https://two-player-coding-racing-game.onrender.com/api/health | grep -q '"ok":true'; then
+              echo "Render public endpoint is healthy"
+              exit 0
+            fi
+            sleep 5
+          done
+          echo "Render health endpoint failed"
+          exit 1
       - uses: actions/upload-artifact@v4
         if: failure()
         with:

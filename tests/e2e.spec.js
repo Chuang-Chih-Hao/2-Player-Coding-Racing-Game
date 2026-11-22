@@ -67,6 +67,7 @@ test("three actual browser sessions: visual blocks, teacher monitoring, synchron
  await t.locator("#resumeRace").click();
  await t.locator("#finishRace").click();
  await expect(t.locator("#report")).toContainText("第 1 回合");
+ await expect(a.locator("#raceOverlay")).toContainText("賽後分析");
  await t.locator("#restartRace").click();
  await a.reload();
  await expect(a.locator("#roomBadge")).toContainText(code);

@@ -2,7 +2,7 @@ import test from "node:test";
 import assert from "node:assert/strict";
 import {io as connect} from "socket.io-client";
 import {createGameServer} from "../server/index.js";
-import {createCar,defaultProgram,execute,makeTrack,stepCar,validateProgram} from "../server/core.js";
+import {createCar,defaultProgram,execute,makeTrack,nearest,stepCar,finishIfNeeded,validateProgram} from "../server/core.js";
 
 test("safe interpreter validates input, nested conditions, and lesson restrictions",()=>{
  const p=defaultProgram();
@@ -36,6 +36,22 @@ test("real car dynamics respond to Scratch blocks and conditions",()=>{
  a.item="nitro";execute(a,"key",{key:"Space"},now);
  assert.ok(a.boostUntil>=now+3000);assert.equal(a.item,null);
  assert.ok(a.events>=3);assert.ok(a.trace.length>0);
+});
+test("a simulated keyboard driver can drive a real checkpointed lap",()=>{
+ const track=makeTrack("rookie"),car=createCar("lap","Lap driver",0,track);
+ execute(car,"start",{},Date.now());
+ let now=Date.now(),steps=0;
+ for(;steps<2400&&car.laps<1;steps++){
+   const {idx}=nearest(track,car.x,car.y);
+   const dest=track.path[(idx+11)%track.path.length];
+   const desired=Math.atan2(dest.y-car.y,dest.x-car.x);
+   const delta=Math.atan2(Math.sin(desired-car.angle),Math.cos(desired-car.angle));
+   car.input={up:true,down:Math.abs(delta)>1.1,left:delta<-.045,right:delta>.045};
+   now+=50;stepCar(car,track,.05,now);
+ }
+ assert.ok(car.laps>=1,"Keyboard-like steering must complete a real lap; got "+car.laps+" after "+steps+" steps at "+car.x+","+car.y);
+ assert.equal(finishIfNeeded(car,1,steps*.05,now),true);
+ assert.ok(car.finishedAt>0);
 });
 test("Socket.IO two-player room, permissions, program locking, race, reconnect and report",async(t)=>{
  const game=createGameServer();

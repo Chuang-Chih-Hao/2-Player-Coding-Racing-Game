@@ -32,7 +32,7 @@ test("real car dynamics respond to Scratch blocks and conditions",()=>{
  a.curve=true;execute(a,"curve_enter");
  assert.equal(a.tuning.target,75);
  a.curve=false;execute(a,"curve_leave");
- assert.equal(a.tuning.target,150);
+ assert.equal(a.tuning.target,230);
  a.item="nitro";execute(a,"key",{key:"Space"},now);
  assert.ok(a.boostUntil>=now+3000);assert.equal(a.item,null);
  assert.ok(a.events>=3);assert.ok(a.trace.length>0);

@@ -269,11 +269,11 @@ function defaultProgram(){
    {type:"action",op:"set_accel",value:8},
    {type:"action",op:"set_steer",value:3},
    {type:"action",op:"set_brake",value:5},
-   {type:"action",op:"set_target",value:150}
+   {type:"action",op:"set_target",value:230}
   ]},
   {type:"event",event:"curve_enter",body:[{type:"if",condition:{type:"condition",kind:"curve"},
     then:[{type:"action",op:"set_target",value:75}],else:[{type:"action",op:"set_target",value:145}]}]},
-  {type:"event",event:"curve_leave",body:[{type:"action",op:"set_target",value:150}]},
+  {type:"event",event:"curve_leave",body:[{type:"action",op:"set_target",value:230}]} ,
   {type:"event",event:"key",key:"Space",body:[{type:"if",condition:{type:"condition",kind:"has_item"},
     then:[{type:"action",op:"use_item"}],else:[]}]},
   {type:"event",event:"pickup",body:[{type:"action",op:"play_sound"}]}

@@ -413,6 +413,43 @@ function updateRoom(){
    $("meta"+(i+1)).textContent=s?(s.connected?"● 已連線 · ":"○ 已離線 · ")+(s.ready?"準備完成":"積木調校中"):"未進入";
  }
  if(r.phase!=="tuning"&&state.testing){state.testing=false;state.practice=null;$("stopTestButton").hidden=true;$("testButton").hidden=false;}
+ if(r.phase==="results")renderResults(r);
+}
+function renderResults(r){
+ const overlay=$("raceOverlay");
+ if(r.phase!=="results")return;
+ const latest=r.history?.at(-1);
+ overlay.replaceChildren();
+ const board=document.createElement("div");
+ board.className="results-board";
+ const title=document.createElement("h2");
+ title.textContent="🏆 第 "+r.round+" 回合 · 賽後分析";
+ board.append(title);
+ if(latest?.cars){
+   for(const record of latest.cars){
+     const section=document.createElement("section");
+     const heading=document.createElement("h3");heading.textContent=record.name;
+     const summary=document.createElement("p");
+     summary.textContent="完成時間："+(record.time===null?"未完成":record.time+" 秒")+
+       "　平均速度："+record.average+"　最高速度："+record.peak;
+     const detail=document.createElement("p");
+     detail.textContent="碰撞："+record.collisions+" 次　積木事件："+record.events+
+       " 次　除錯嘗試："+record.attempts+" 次";
+     const changes=document.createElement("p");
+     changes.textContent="程式修改："+(record.modified?.join("、")||"保持原設定");
+     section.append(heading,summary,detail,changes);
+     if(record.previousAverage!==null){
+       const compare=document.createElement("p");
+       compare.textContent="與上回合平均速度差異："+(record.average-record.previousAverage>0?"+":"")+
+         (record.average-record.previousAverage);
+       section.append(compare);
+     }
+     board.append(section);
+   }
+ }else{
+   const p=document.createElement("p");p.textContent="比賽完成，老師可查看詳細回合紀錄。";board.append(p);
+ }
+ overlay.append(board);
 }
 function showStudent(){
  const r=state.room;if(!r||state.role!=="teacher")return;
@@ -570,7 +607,7 @@ function animationFrame(){
  }else $("countdown").hidden=true;
  $("raceOverlay").hidden=!["paused","results"].includes(r.phase);
  if(r.phase==="paused")$("raceOverlay").textContent="⏸ 教師已暫停比賽";
- if(r.phase==="results")$("raceOverlay").textContent="🏆 比賽結束 · 查看賽後分析";
+ if(r.phase==="results"&&!$("raceOverlay").childElementCount)renderResults(r);
  const my=state.role==="student"?cars.find(c=>c.id===state.playerId):cars.find(c=>c.id===state.selected);
  const sorted=[...cars].sort((a,b)=>(b.laps*360+b.progress)-(a.laps*360+a.progress));
  $("lapDisplay").textContent=my?(my.laps+1>r.laps?r.laps:my.laps+1)+"/"+r.laps:"—";

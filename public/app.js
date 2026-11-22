@@ -202,7 +202,8 @@ function astActionChain(block){
 }
 function programAst(){
  if(!state.workspace)return [];
- const top=state.workspace.getTopBlocks(true),events=[];
+ const order=["start","curve_enter","curve_leave","key","pickup","line","collision","boost_zone","finish"];
+ const top=state.workspace.getTopBlocks(true).sort((a,b)=>order.indexOf(a.type.slice(6))-order.indexOf(b.type.slice(6))),events=[];
  for(const block of top){
    if(!block.type.startsWith("event_"))throw new Error("積木必須接在「當……時」事件帽子下方，不能單獨放在工作區");
    const event=block.type.slice(6);

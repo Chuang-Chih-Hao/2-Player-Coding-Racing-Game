@@ -63,3 +63,5 @@ header{height:82px;background:#101d30;border-bottom:1px solid #30455d;display:fl
 .teacher-messages{font-size:13px;line-height:1.6;color:#d7eaf2;min-height:45px}.teacher-messages article{border-bottom:1px solid #30455a;padding:5px 0}
 .report{padding-bottom:30px}.report section{background:#1b2f45;border:1px solid #405570;border-radius:12px;padding:11px;margin-top:9px}.report strong{color:#8df0d3}.report small{color:#acbed5}
 @media(prefers-reduced-motion:reduce){*{transition:none!important;animation:none!important}}
+
+[hidden]{display:none!important}

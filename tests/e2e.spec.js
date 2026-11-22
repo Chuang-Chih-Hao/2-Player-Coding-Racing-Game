@@ -7,8 +7,8 @@ test("three actual browser sessions: visual blocks, teacher monitoring, synchron
  await t.goto("/");
  await t.locator("#roleTeacher").click();
  await t.locator("#createButton").click();
+ await expect(t.locator("#teacherCode")).toHaveText(/^[A-F0-9]{6}$/);
  const code=(await t.locator("#teacherCode").innerText()).trim();
- expect(code).toMatch(/^[A-F0-9]{6}$/);
  for(const [p,name]of [[a,"A 車手"],[b,"B 車手"]]){
   await p.goto("/?room="+code);
   await p.locator("#studentName").fill(name);

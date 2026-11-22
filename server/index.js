@@ -324,13 +324,27 @@ export function createGameServer(options={}) {
   });
   function calculateModified(program) {
     const base=defaultProgram(),out=[];
-    const flat=p=>p.flatMap(e=>[e,...e.body]);
-    const a=flat(base),b=flat(program);
-    for(let i=0;i<Math.max(a.length,b.length);i++){
-      if(a[i]?.type==="action" && b[i]?.op===a[i].op && a[i].value!==b[i].value)
-        out.push(a[i].op+": "+a[i].value+" → "+b[i].value);
+    const values=(source)=>{
+      const map=new Map();
+      function walk(body){
+        for(const n of body||[]){
+          if(n.type==="action" && PARAMS[n.op] && !map.has(n.op))map.set(n.op,n.value);
+          if(n.type==="if"){walk(n.then);walk(n.else);}
+        }
+      }
+      for(const e of source)walk(e.body);
+      return map;
+    };
+    const before=values(base),after=values(program);
+    for(const [op,value] of after){
+      if(before.has(op)&&before.get(op)!==value){
+        const label={set_max:"最高速度",set_accel:"加速度",set_steer:"轉向靈敏度",
+          set_brake:"煞車強度",set_target:"目標速度",change_speed:"速度"}[op]||op;
+        out.push(label+": "+before.get(op)+" → "+value);
+      }
     }
-    if(!out.length&&JSON.stringify(program.map(e=>e.body))!==JSON.stringify(base.map(e=>e.body)))out.push("事件／條件積木已調整");
+    const canonical=x=>JSON.stringify(x,(key,value)=>key==="id"?undefined:value);
+    if(!out.length&&canonical(program)!==canonical(base))out.push("事件／條件積木已調整");
     return out;
   }
   let ticks=0;

@@ -16,7 +16,7 @@ const conditionLabels={curve:"目前在彎道",speed_gt:"速度大於",collision
 const itemLabels={nitro:"氮氣加速",shield:"防護盾",grip:"抓地力",jammer:"干擾器"};
 const socket=io({reconnection:true,reconnectionDelay:500});
 const state={role:null,code:null,token:null,playerId:null,room:null,
-  workspace:null,monitor:null,selected:"p1",visual:new Map(),cars:[],practice:null,testing:false,
+  workspace:null,monitor:null,selected:"p1",markBlockId:null,visual:new Map(),cars:[],practice:null,testing:false,
   lastProgramStr:"",lastTeacherProgramStr:"",suppress:false,ready:false,connected:false,
   lastTrace:"",lastServerError:""};
 const canvas=$("raceCanvas"),ctx=canvas.getContext("2d");
@@ -171,6 +171,12 @@ function initMonitor(){
  if(!defineBlockly())return;
  state.monitor=Blockly.inject("teacherBlockly",{readOnly:true,toolbox:null,scrollbars:true,
    zoom:{controls:true,wheel:true,startScale:.55,maxScale:1.5,minScale:.35},renderer:"zelos",sounds:false});
+ state.monitor.addChangeListener(e=>{
+   if(e.type===Blockly.Events.SELECTED && e.newElementId){
+     state.markBlockId=e.newElementId;
+     $("markedBlock").textContent="已標記積木："+e.newElementId;
+   }
+ });
 }
 function astActionChain(block){
  const out=[];let n=block,count=0;
@@ -214,7 +220,7 @@ function addBlockly(ws,node,x=15,y=15){
  else if(node.type==="if")type="ctrl_ifelse";
  else if(node.type==="condition")type="cond_"+node.kind;
  if(!Blockly.Blocks[type])throw new Error("未知積木 "+type);
- const b=ws.newBlock(type);
+ const b=ws.newBlock(type,node.id);
  b.initSvg();
  if(node.type==="action"&&params[node.op])b.setFieldValue(String(node.value),"VALUE");
  if(node.type==="event"&&node.event==="key")b.setFieldValue(node.key||"Space","KEY");
@@ -443,8 +449,8 @@ function showStudent(){
    $("report").append(sec);
  }
 }
-$("selectP1").onclick=()=>{state.selected="p1";state.lastTeacherProgramStr="";showStudent();};
-$("selectP2").onclick=()=>{state.selected="p2";state.lastTeacherProgramStr="";showStudent();};
+$("selectP1").onclick=()=>{state.selected="p1";state.markBlockId=null;$("markedBlock").textContent="未選取積木";state.lastTeacherProgramStr="";showStudent();};
+$("selectP2").onclick=()=>{state.selected="p2";state.markBlockId=null;$("markedBlock").textContent="未選取積木";state.lastTeacherProgramStr="";showStudent();};
 $("applySettings").onclick=async()=>{if(await call("teacher:set",{topic:$("topicSelect").value,track:$("trackSelect").value,
   laps:Number($("lapsSelect").value),difficulty:Number($("difficultySelect").value)}))toast("本回合設定已更新");};
 for(const [id,action]of Object.entries({startRace:"start",pauseRace:"pause",resumeRace:"resume",
@@ -464,7 +470,7 @@ $("teacherStopTest").onclick=async()=>{if(await call("teacher:stopTest",{playerI
 $("rescueCar").onclick=async()=>{if(await call("teacher:rescue",{playerId:state.selected}))toast("已將賽車移回路線");};
 $("sendHint").onclick=async()=>{
  const message=$("teacherHint").value;
- if(await call("teacher:hint",{playerId:state.selected,message})){toast("提示已傳送");$("teacherHint").value="";}
+ if(await call("teacher:hint",{playerId:state.selected,message,blockId:state.markBlockId||""})){toast("提示已傳送");$("teacherHint").value="";}
 };
 function pathFor(track){
  const points=[];

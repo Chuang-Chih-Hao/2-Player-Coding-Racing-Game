@@ -65,3 +65,10 @@ header{height:82px;background:#101d30;border-bottom:1px solid #30455d;display:fl
 @media(prefers-reduced-motion:reduce){*{transition:none!important;animation:none!important}}
 
 [hidden]{display:none!important}
+
+.results-board{width:910px;padding:20px 24px;background:#0c1b2ee8;border:1px solid #56908d;border-radius:18px;
+ display:grid;grid-template-columns:1fr 1fr;gap:14px;text-shadow:none;box-shadow:0 15px 55px #0009}
+.results-board h2{font-size:30px;margin:0 0 4px;grid-column:1/-1;text-align:center;color:#9af5d4}
+.results-board section{background:#172f48;border:1px solid #4a7892;border-radius:12px;padding:14px;min-height:165px}
+.results-board h3{font-size:20px;margin:0 0 12px;color:#fff}
+.results-board p{font-size:14px;line-height:1.55;margin:6px 0;color:#cfe1f5}

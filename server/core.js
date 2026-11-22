@@ -21,7 +21,7 @@ export function defaultProgram() {
       {type:"action",op:"set_accel",value:8,id:"default-accel"},
       {type:"action",op:"set_steer",value:3,id:"default-steer"},
       {type:"action",op:"set_brake",value:5,id:"default-brake"},
-      {type:"action",op:"set_target",value:150,id:"default-target"}
+      {type:"action",op:"set_target",value:230,id:"default-target"}
     ]},
     {type:"event",event:"curve_enter",id:"default-curve",body:[
       {type:"if",id:"default-if",condition:{type:"condition",kind:"curve",id:"default-cond"},then:[
@@ -29,7 +29,7 @@ export function defaultProgram() {
       ],else:[{type:"action",op:"set_target",value:145,id:"default-curve-else"}]}
     ]},
     {type:"event",event:"curve_leave",id:"default-leave",body:[
-      {type:"action",op:"set_target",value:150,id:"default-leave-target"}
+      {type:"action",op:"set_target",value:230,id:"default-leave-target"}
     ]},
     {type:"event",event:"key",key:"Space",id:"default-key",body:[
       {type:"if",id:"default-item-if",condition:{type:"condition",kind:"has_item",id:"default-has-item"},

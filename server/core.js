@@ -45,7 +45,7 @@ export function validateProgram(source, topic="free") {
   if (!Array.isArray(source) || source.length>18) fail("事件積木數量過多，最多 18 組");
   let count=0; const ids=new Set();
   function idCheck(n) {
-    if(typeof n.id!=="string" || n.id.length<1 || n.id.length>110 || !/^[\w-]+$/.test(n.id)) fail("積木識別資料有誤，請重新放置積木");
+    if(typeof n.id!=="string" || n.id.length<1 || n.id.length>110 || /[\u0000-\u001f<>]/.test(n.id)) fail("積木識別資料有誤，請重新放置積木");
     if(ids.has(n.id)) fail("積木有重複識別碼，請重新拖曳");
     ids.add(n.id);
     if(++count>100) fail("一次最多使用 100 個積木");

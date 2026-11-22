@@ -22,7 +22,12 @@ test("real car dynamics respond to Scratch blocks and conditions",()=>{
  assert.equal(a.tuning.max,210);assert.equal(b.tuning.max,95);
  a.input.up=true;b.input.up=true;
  let now=Date.now();
- for(let i=0;i<150;i++){now+=50;stepCar(a,track,.05,now);stepCar(b,track,.05,now);}
+ for(let i=0;i<150;i++){
+  // Hold both cars on the same stretch of legal asphalt to isolate top-speed behavior.
+  const p=track.path[90],q=track.path[91];
+  for(const c of [a,b]){c.x=p.x;c.y=p.y;c.angle=Math.atan2(q.y-p.y,q.x-p.x);}
+  now+=50;stepCar(a,track,.05,now);stepCar(b,track,.05,now);
+ }
  assert.ok(a.peak>b.peak,"higher configured speed must affect physical speed");
  a.curve=true;execute(a,"curve_enter");
  assert.equal(a.tuning.target,75);

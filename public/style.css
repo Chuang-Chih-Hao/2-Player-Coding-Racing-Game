@@ -36,18 +36,29 @@ header{height:82px;background:#101d30;border-bottom:1px solid #30455d;display:fl
 #trackFooter{height:77px;display:flex;align-items:center;gap:17px;padding:10px 16px;background:#13283c}
 .pilot-card{display:flex;align-items:center;gap:11px;min-width:175px}.pilot-card strong{display:block;font-size:15px}.pilot-card small{color:#93acc2;font-size:12px}.pilot-dot{width:15px;height:15px;border-radius:6px;flex:none}.blue{background:#55c9ff}.pink{background:#ff86ae}
 .driver-key{margin-left:auto;font-size:12px;color:#93aec6}
-#rightPanel{height:818px;overflow:hidden;background:#101c2e;padding:18px 21px}
+#rightPanel{height:818px;overflow:hidden;background:#101c2e;padding:16px 21px}
+#studentPanel{display:flex;flex-direction:column;height:100%;min-height:0}
+.editor-title-actions{display:flex;align-items:center;gap:9px}
+.expand-editor{font-size:12px;padding:9px 11px;background:#28465e;color:#a3f4e1;border-color:#518b95;font-weight:800}
+#stage.editor-focus #rightPanel{position:absolute;z-index:45;left:194px;right:22px;top:92px;bottom:18px;width:auto;height:auto;background:#122038;border:2px solid #76d8c0;box-shadow:0 16px 80px #010917d9;border-radius:17px;padding:18px 23px}
+#stage.editor-focus #blocklyDiv{border-color:#72d4ba}
+#stage.editor-focus #trackPanel{filter:brightness(.5)}
+#stage.editor-focus #studentPanel{height:100%}
 .side-title{display:flex;justify-content:space-between;align-items:center;gap:10px}
 .side-title h2{margin:8px 0 6px;font-size:23px}
 .chip{background:#243958;border:1px solid #395b79;color:#8ff7d9;padding:7px 10px;border-radius:20px;font-size:11px;font-weight:800}
 .mission{font-size:14px;color:#b3c8dd;min-height:31px;margin:7px 0 9px}
-.editor-toolbar{display:flex;gap:6px;margin:9px 0}.editor-toolbar button{flex:1;padding:9px 7px;font-size:12px}
-#blocklyDiv{height:480px;width:558px;border-radius:12px;overflow:hidden;background:#e7eff6;border:2px solid #4b637a}
+.editor-toolbar{display:flex;gap:6px;margin:8px 0;flex:none}.editor-toolbar button{flex:1;padding:9px 4px;font-size:12px;min-width:0}
+#blocklyDiv{flex:1 1 auto;min-height:0;height:0;width:100%;border-radius:12px;overflow:hidden;background:#e7eff6;border:2px solid #4b637a}
 .blocklyToolboxDiv{background:#d9e7f4!important}.blocklyMainBackground{stroke:#a8bed4!important}.blocklyTreeLabel{font-family:"Microsoft JhengHei",sans-serif!important}
-.student-actions{display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;margin-top:12px}.student-actions button{font-size:13px;padding:11px 6px}
-.student-actions #helpButton{grid-column:span 3;padding:8px}
-.console{padding:10px 12px;background:#0a1527;border-radius:12px;border:1px solid #30455f;margin-top:10px;min-height:64px}
-.console-title{font-size:12px;color:#67e6c3;font-weight:900}.console #codeFeedback{color:#e7eef7;font-size:13px;margin-top:5px;line-height:1.4}
+.student-actions{display:flex;gap:7px;margin-top:9px;flex:none}.student-actions button{font-size:12px;padding:11px 6px;flex:1;min-width:0}
+.console{flex:none;padding:9px 12px;background:#0a1527;border-radius:12px;border:1px solid #30455f;margin-top:9px}
+.console-title{font-size:13px;color:#67e6c3;font-weight:900;cursor:pointer;list-style-position:inside}
+.console-title small{font-size:11px;font-weight:500;color:#a2bfd1;margin-left:8px}
+.console[open] #codeFeedback{border-top:1px solid #30455f;padding-top:9px;margin-top:9px;max-height:85px;overflow:auto}
+.console #codeFeedback{color:#e7eef7;font-size:13px;line-height:1.4}
+.track-legend{position:absolute;left:14px;bottom:12px;display:flex;gap:10px;pointer-events:none;color:#e6fff9;font-size:12px;font-weight:700}
+.track-legend span{background:#0b2532dc;border:1px solid #4d7f78;padding:6px 9px;border-radius:9px}
 #toast{position:absolute;left:50%;bottom:17px;transform:translateX(-50%);background:#223956;color:#f2f7ff;border:1px solid #65d9bc;box-shadow:0 10px 20px #0006;border-radius:16px;padding:12px 24px;font-size:16px;opacity:0;pointer-events:none;transition:opacity .2s;z-index:100}
 #toast.show{opacity:1}
 .teacher-scroll{overflow-y:auto;height:736px;padding-right:5px;scrollbar-width:thin;scrollbar-color:#59738e #14273c}

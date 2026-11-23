@@ -432,6 +432,8 @@ socket.on("race:snapshot",snap=>{
 });
 function updateRoom(){
  const r=state.room;if(!r)return;
+ // Previous race snapshots must not leave a stranded-looking ghost car in a new lesson.
+ if(r.phase==="tuning"&&(!r.cars||!r.cars.length)&&state.cars.length){state.cars=[];state.visual.clear();}
  $("roomBadge").textContent="房間 "+r.code;
  const phase={tuning:"積木調校階段",countdown:"起跑倒數",racing:"正式比賽中",paused:"課堂暫停中",results:"賽後分析"};
  $("phaseBadge").textContent=phase[r.phase]||"等待中";
@@ -495,7 +497,7 @@ function renderResults(r){
      summary.textContent="完成時間："+(record.time===null?"未完成":record.time+" 秒")+
        "　平均速度："+record.average+"　最高速度："+record.peak;
      const detail=document.createElement("p");
-     detail.textContent="碰撞："+record.collisions+" 次　積木事件："+record.events+
+     detail.textContent="碰撞："+record.collisions+" 次　回賽道救援："+(record.rescues||0)+" 次　積木事件："+record.events+
        " 次　除錯嘗試："+record.attempts+" 次";
      const changes=document.createElement("p");
      changes.textContent="程式修改："+(record.modified?.join("、")||"保持原設定");
@@ -542,7 +544,7 @@ function showStudent(){
    for(const c of result.cars){
      const p=document.createElement("p");
      p.textContent=c.name+"｜"+(c.finished?c.time+" 秒":"未完成")+"｜平均 "+c.average+
-       "｜極速 "+c.peak+"｜碰撞 "+c.collisions+"｜事件 "+c.events+
+       "｜極速 "+c.peak+"｜碰撞 "+c.collisions+"｜救援 "+(c.rescues||0)+"｜事件 "+c.events+
        "｜修改："+c.modified.join("、")+(c.previousAverage!==null?"｜上次平均 "+c.previousAverage:"");
      sec.append(p);
    }

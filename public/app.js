@@ -17,7 +17,7 @@ const itemLabels={nitro:"氮氣加速",shield:"防護盾",grip:"抓地力",jamme
 const socket=io({reconnection:true,reconnectionDelay:500});
 const state={role:null,code:null,token:null,playerId:null,room:null,
   workspace:null,monitor:null,selected:"p1",markBlockId:null,visual:new Map(),cars:[],practice:null,testing:false,
-  lastProgramStr:"",lastTeacherProgramStr:"",suppress:false,ready:false,connected:false,
+  lastProgramStr:"",lastTeacherProgramStr:"",suppress:false,ready:false,connected:false,topicShown:null,
   lastTrace:"",lastServerError:""};
 const canvas=$("raceCanvas"),ctx=canvas.getContext("2d");
 const localKey="coding-racing-session-v1";
@@ -25,7 +25,9 @@ function toast(message,ms=2700){
   const t=$("toast");t.textContent=message;t.classList.add("show");
   clearTimeout(toast.timer);toast.timer=setTimeout(()=>t.classList.remove("show"),ms);
 }
-function explain(message){$("codeFeedback").textContent=message;}
+function explain(message){$("codeFeedback").textContent=message;
+ if(/錯誤|修正|無法|老師提示|超出|未正確/.test(message))$("feedbackPanel").open=true;
+}
 function call(name,payload={}){
   return new Promise(resolve=>socket.emit(name,payload,result=>{
     if(!result?.ok){const msg=result?.error||"伺服器沒有回應";toast(msg);state.lastServerError=msg;resolve(null);}
@@ -247,13 +249,37 @@ function connectList(ws,list,head){
    connection=child.nextConnection;
  }
 }
+function arrangeBlocks(ws=state.workspace,topic=state.room?.topic||"free"){
+ if(!ws)return;
+ // Keep the learning target expanded; fold unrelated stock events.
+ const relevant={max:["start"],accel:["start"],curve:["curve_enter"],item:["pickup","key"]}[topic];
+ const order=Object.keys(eventLabels);
+ const blocks=ws.getTopBlocks(false).sort((a,b)=>{
+  const ia=order.indexOf(a.type.slice(6)),ib=order.indexOf(b.type.slice(6));
+  return (ia<0?999:ia)-(ib<0?999:ib);
+ });
+ const suppressBefore=state.suppress;
+ if(ws===state.workspace)state.suppress=true;
+ Blockly.Events.disable();
+ try{
+  let y=25;
+  for(const b of blocks){
+   if(b.type.startsWith("event_"))b.setCollapsed(!!relevant&&!relevant.includes(b.type.slice(6)));
+   const p=b.getRelativeToSurfaceXY();
+   b.moveBy(35-p.x,y-p.y);
+   y+=Math.max(40,b.getHeightWidth().height)+30;
+  }
+ }finally{Blockly.Events.enable();state.suppress=suppressBefore;}
+ Blockly.svgResize(ws);
+}
 function loadProgram(program,ws=state.workspace){
  if(!ws)return;
  if(ws===state.workspace)state.suppress=true;
  Blockly.Events.disable();
  try{
    ws.clear();
-   (program||[]).forEach((evt,i)=>addBlockly(ws,evt,32+(i%2)*265,22+Math.floor(i/2)*200));
+   (program||[]).forEach(evt=>addBlockly(ws,evt,35,25));
+   arrangeBlocks(ws);
  }catch(e){toast("重建積木遇到問題："+e.message);}
  finally{Blockly.Events.enable();if(ws===state.workspace)state.suppress=false;}
  Blockly.svgResize(ws);
@@ -292,7 +318,17 @@ function storeProgram(){
 }
 $("undoButton").onclick=()=>state.workspace?.undo(false);
 $("redoButton").onclick=()=>state.workspace?.undo(true);
-$("resetButton").onclick=()=>{loadProgram(defaultProgram());sendDraft();};
+$("arrangeButton").onclick=()=>{arrangeBlocks();toast("積木已整理，不會互相重疊");};
+$("resetButton").onclick=()=>{loadProgram(defaultProgram());sendDraft();toast("已恢復預設積木，沒有重設正式比賽");};
+function toggleEditor(force){
+ const expanded=force??!$("stage").classList.contains("editor-focus");
+ $("stage").classList.toggle("editor-focus",expanded);
+ $("expandEditor").textContent=expanded?"⤢ 返回賽道畫面":"⛶ 放大積木";
+ $("expandEditor").setAttribute("aria-pressed",String(expanded));
+ requestAnimationFrame(()=>{resizeGame();if(state.workspace)Blockly.svgResize(state.workspace);});
+}
+$("expandEditor").onclick=()=>toggleEditor();
+document.addEventListener("keydown",e=>{if(e.key==="Escape"&&$("stage").classList.contains("editor-focus"))toggleEditor(false);});
 $("clearButton").onclick=()=>{if(state.workspace){state.workspace.clear();sendDraft();}};
 $("saveButton").onclick=storeProgram;
 $("lockButton").onclick=async()=>{
@@ -303,18 +339,21 @@ $("lockButton").onclick=async()=>{
  }catch(e){toast(e.message);}
 };
 $("unlockButton").onclick=async()=>{if(await call("program:unlock")){state.ready=false;updateRoom();}};
-$("testButton").onclick=async()=>{
+async function startPractice(retry=false){
  try{const program=programAst();if(await call("student:test",{program})){
-    state.testing=true;state.practice=null;toast("練習開始！使用方向鍵駕駛");
-    $("stopTestButton").hidden=false;$("testButton").hidden=true;
+    state.testing=true;state.practice=null;
+    toast(retry?"已回到起點，重新開始練習":"練習開始！使用方向鍵駕駛");
+    $("retryTestButton").hidden=false;$("stopTestButton").hidden=false;$("testButton").hidden=true;
  }}catch(e){toast(e.message);}
-};
+}
+$("testButton").onclick=()=>startPractice(false);
+$("retryTestButton").onclick=()=>startPractice(true);
 $("stopTestButton").onclick=stopTest;
 async function stopTest(){
- if(await call("student:test",{stop:true})){state.testing=false;state.practice=null;$("stopTestButton").hidden=true;$("testButton").hidden=false;}
+ if(await call("student:test",{stop:true})){state.testing=false;state.practice=null;$("stopTestButton").hidden=true;$("retryTestButton").hidden=true;$("testButton").hidden=false;}
 }
-$("helpButton").onclick=async()=>{if(await call("student:help"))toast("已通知老師查看你的積木與錯誤");};
-socket.on("practice:stopped",()=>{state.testing=false;state.practice=null;$("stopTestButton").hidden=true;$("testButton").hidden=false;toast("老師已暫停你的練習");});
+$("helpButton").onclick=async()=>{if(await call("student:help")){toast("已向老師舉手求助，老師可查看你的積木");explain("已向老師發出求助通知。這裡會顯示積木執行紀錄、錯誤及老師提示。");}};
+socket.on("practice:stopped",()=>{state.testing=false;state.practice=null;$("stopTestButton").hidden=true;$("retryTestButton").hidden=true;$("testButton").hidden=false;toast("老師已暫停你的練習");});
 socket.on("practice:update",data=>{state.practice=data;});
 socket.on("program:replace",data=>{if(state.role==="student"){state.ready=false;loadProgram(data.program);explain(data.reason);toast(data.reason);}});
 socket.on("teacher:message",item=>{
@@ -386,14 +425,15 @@ function updateRoom(){
      state.workspace.setVisible(true);
      const disallowed=state.workspace.options.readOnly; // Blockly editor stays visible during the race, controls are locked.
      for(const b of state.workspace.getAllBlocks(false))b.setEditable(editable);
-     state.workspace.updateToolbox(toolbox(r.topic));
+     if(state.topicShown!==r.topic){state.workspace.updateToolbox(toolbox(r.topic));arrangeBlocks(state.workspace,r.topic);state.topicShown=r.topic;}
      Blockly.svgResize(state.workspace);
    }
    $("lockButton").disabled=!editable||r.phase!=="tuning";
    $("testButton").disabled=!editable||r.phase!=="tuning";
+   $("retryTestButton").disabled=!editable||r.phase!=="tuning";
    $("unlockButton").hidden=!state.ready||r.phase!=="tuning";
    $("lockButton").hidden=state.ready&&r.phase==="tuning";
-   for(const id of ["resetButton","clearButton","saveButton","undoButton","redoButton"])$(id).disabled=!editable;
+   for(const id of ["resetButton","clearButton","saveButton","undoButton","redoButton","arrangeButton"])$(id).disabled=!editable;
  }else if(state.role==="teacher"){
    $("teacherCode").textContent=r.code;
    $("topicSelect").value=r.topic;$("trackSelect").value=r.track;
@@ -412,7 +452,7 @@ function updateRoom(){
    $("name"+(i+1)).textContent=s?.name||"等待學生 "+(i===0?"A":"B");
    $("meta"+(i+1)).textContent=s?(s.connected?"● 已連線 · ":"○ 已離線 · ")+(s.ready?"準備完成":"積木調校中"):"未進入";
  }
- if(r.phase!=="tuning"&&state.testing){state.testing=false;state.practice=null;$("stopTestButton").hidden=true;$("testButton").hidden=false;}
+ if(r.phase!=="tuning"&&state.testing){state.testing=false;state.practice=null;$("stopTestButton").hidden=true;$("retryTestButton").hidden=true;$("testButton").hidden=false;}
  if(r.phase==="results")renderResults(r);
 }
 function renderResults(r){

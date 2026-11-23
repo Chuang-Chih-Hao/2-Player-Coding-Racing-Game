@@ -5,7 +5,7 @@ import {Server} from "socket.io";
 import {fileURLToPath} from "node:url";
 import path from "node:path";
 import {ACTIONS,PARAMS,TOPICS,TRACKS,clamp,createCar,defaultProgram,
-  execute,finishIfNeeded,makeTrack,simpleCar,stepCar,validateProgram} from "./core.js";
+  execute,finishIfNeeded,makeTrack,rescueCarToTrack,simpleCar,stepCar,validateProgram} from "./core.js";
 
 const secret=()=>randomBytes(24).toString("hex");
 const roomCode=()=>randomBytes(3).toString("hex").toUpperCase();
@@ -56,7 +56,7 @@ function summary(room) {
       const older=previous?.cars.find(p=>p.id===c.id);
       return {id:c.id,name:c.name,finished:c.finished,time:c.finishedAt,
         average:c.samples?Math.round(c.avgAccumulator/c.samples):0,
-        peak:Math.round(c.peak),collisions:c.collisions,events:c.events,
+        peak:Math.round(c.peak),collisions:c.collisions,rescues:c.rescueCount||0,events:c.events,
         program:clone(student?.program||defaultProgram()),modified:student?.modified||[],
         attempts:student?.attempts||0,errors:student?.errors||0,fixes:student?.fixes||0,
         previousTime:older?.time??null,previousAverage:older?.average??null};
@@ -237,6 +237,20 @@ export function createGameServer(options={}) {
       execute(car,"key",{key},Date.now(),entry=>trace(room,car,entry));
       okay(ack);
     });
+    socket.on("student:rescue",(_data,ack)=>{
+      const room=inside(socket,ack,"student");if(!room)return;
+      const s=room.students[socket.data.slot];
+      const practice=room.phase==="tuning"&&!!s.practice;
+      if(!practice&&room.phase!=="racing")return error(ack,"僅練習或正式競速時可以回賽道");
+      const car=practice?s.practice:room.cars.find(c=>c.id===s.id);
+      if(!car||car.finished)return error(ack,"目前沒有進行中的賽車");
+      const now=Date.now();
+      if(now-car.lastRescue<1500)return error(ack,"稍等一下再回賽道");
+      rescueCarToTrack(car,makeTrack(room.track),now);
+      if(practice){if(s.socketId)io.to(s.socketId).emit("practice:update",simpleCar(car));}
+      else io.to(room.code).emit("race:snapshot",{phase:room.phase,elapsed:room.elapsed,countdownAt:room.countdownAt,cars:room.cars.map(simpleCar)});
+      okay(ack,{rescueCount:car.rescueCount});
+    });
     socket.on("student:test",(data={},ack)=>{
       const room=inside(socket,ack,"student");if(!room)return;
       const s=room.students[socket.data.slot];
@@ -307,10 +321,7 @@ export function createGameServer(options={}) {
       const room=inside(socket,ack,"teacher");if(!room)return;
       const car=room.cars.find(v=>v.id===data.playerId);
       if(!car)return error(ack,"找不到賽車");
-      const track=makeTrack(room.track),p=track.path[car.progress];
-      car.x=p.x;car.y=p.y;
-      const q=track.path[(car.progress+1)%track.path.length];
-      car.angle=Math.atan2(q.y-p.y,q.x-p.x);car.speed=0;
+      rescueCarToTrack(car,makeTrack(room.track),Date.now());
       okay(ack);notify(io,room);
     });
     socket.on("disconnect",()=>{

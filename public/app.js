@@ -6,7 +6,14 @@ const topicText={
  accel:"本回合只修改「加速度」積木，比較起跑與過彎時的反應。",
  curve:"調整「當進入彎道時」的 if / else 事件，讓賽車學會彎道減速。",
  item:"修改「當取得道具」或「當按下按鍵」的程式，決定道具何時使用。",
- free:"自由組合事件、變數與條件判斷，設計自己的賽車策略。"
+ free:"自由組合事件、變數與條件判斷，設計自己的賽車策略."
+};
+const lessonGuide={
+ max:"① 找到「當比賽開始時」 ② 點「將最高速度設為」的白色數字 ③ 練習測試",
+ accel:"① 找到「當比賽開始時」 ② 點「將加速度設為」的白色數字 ③ 比較起步",
+ curve:"① 找到「當進入彎道時」 ② 找「如果／否則」 ③ 調整過彎速度",
+ item:"① 找「當按下空白鍵時」 ② 看「如果有道具」 ③ 練習啟動道具",
+ free:"可以自由組合不同事件，按「展開全部」查看其餘預設積木。"
 };
 const opLabels={set_max:"最高速度",set_accel:"加速度",set_steer:"轉向靈敏度",set_brake:"煞車強度",set_target:"目標速度",change_speed:"速度改變"};
 const params={set_max:[70,230,150],set_accel:[3,16,8],set_steer:[1,6,3],set_brake:[2,12,5],set_target:[35,230,150],change_speed:[-40,40,10]};
@@ -18,7 +25,7 @@ const socket=io({reconnection:true,reconnectionDelay:500});
 const state={role:null,code:null,token:null,playerId:null,room:null,
   workspace:null,monitor:null,selected:"p1",markBlockId:null,visual:new Map(),cars:[],practice:null,testing:false,
   lastProgramStr:"",lastTeacherProgramStr:"",suppress:false,ready:false,connected:false,topicShown:null,
-  lastTrace:"",lastServerError:""};
+  lastTrace:"",lastServerError:"",blocksMode:"focus",lastRescue:0};
 const canvas=$("raceCanvas"),ctx=canvas.getContext("2d");
 const localKey="coding-racing-session-v1";
 function toast(message,ms=2700){
@@ -264,7 +271,7 @@ function arrangeBlocks(ws=state.workspace,topic=state.room?.topic||"free"){
  try{
   let y=25;
   for(const b of blocks){
-   if(b.type.startsWith("event_"))b.setCollapsed(!!relevant&&!relevant.includes(b.type.slice(6)));
+   if(b.type.startsWith("event_"))b.setCollapsed(ws===state.workspace&&state.blocksMode==="all"?false:!!relevant&&!relevant.includes(b.type.slice(6)));
    const p=b.getRelativeToSurfaceXY();
    b.moveBy(35-p.x,y-p.y);
    y+=Math.max(40,b.getHeightWidth().height)+30;
@@ -319,6 +326,13 @@ function storeProgram(){
 $("undoButton").onclick=()=>state.workspace?.undo(false);
 $("redoButton").onclick=()=>state.workspace?.undo(true);
 $("arrangeButton").onclick=()=>{arrangeBlocks();toast("積木已整理，不會互相重疊");};
+$("allBlocksButton").onclick=()=>{
+ state.blocksMode=state.blocksMode==="all"?"focus":"all";
+ $("allBlocksButton").textContent=state.blocksMode==="all"?"只看本回合":"展開全部";
+ $("blockViewNote").textContent=state.blocksMode==="all"?"全部事件積木已展開，可以上下捲動查看；按「只看本回合」會收起其他功能。":"其他功能收成短橘色積木，並沒有刪除；點一下也能展開。";
+ arrangeBlocks();
+ toast(state.blocksMode==="all"?"全部積木已展開，可以上下捲動":"已收起其他功能，保留本回合積木");
+};
 $("resetButton").onclick=()=>{loadProgram(defaultProgram());sendDraft();toast("已恢復預設積木，沒有重設正式比賽");};
 function toggleEditor(force){
  const expanded=force??!$("stage").classList.contains("editor-focus");
@@ -387,8 +401,15 @@ const driveKeys={ArrowUp:"up",w:"up",W:"up",ArrowDown:"down",s:"down",S:"down",
   ArrowLeft:"left",a:"left",A:"left",ArrowRight:"right",d:"right",D:"right"};
 const input={up:false,down:false,left:false,right:false};
 function sendInput(){if(state.role==="student")socket.emit("drive",{...input});}
+async function returnToTrack(){
+ if(!state.connected||Date.now()-state.lastRescue<1500)return;
+ const result=await call("student:rescue");
+ if(result){state.lastRescue=Date.now();state.visual.delete(state.playerId);toast("已回安全賽道！按 ↑ / W 加速（本場第 "+result.rescueCount+" 次回賽道）");}
+}
+$("rescueButton").onclick=returnToTrack;
 document.addEventListener("keydown",e=>{
  if(state.role!=="student"||!state.room||["INPUT","TEXTAREA","SELECT"].includes(e.target.tagName))return;
+ if(e.key.toLowerCase()==="r"&&!e.repeat&&(state.testing||state.room.phase==="racing")){returnToTrack();e.preventDefault();}
  if(driveKeys[e.key]){if(!input[driveKeys[e.key]]){input[driveKeys[e.key]]=true;sendInput();}e.preventDefault();}
  if([" ","Shift","e"].includes(e.key)&&!e.repeat){const key=e.key===" "?"Space":e.key;socket.emit("key:event",{key});e.preventDefault();}
 });
@@ -417,6 +438,7 @@ function updateRoom(){
  $("trackTitle").textContent=roomNames[r.track];
  $("missionTag").textContent=(r.topic==="free"?"自由設計":r.topic==="curve"?"條件判斷":r.topic==="item"?"事件觸發":"變數任務");
  $("missionDescription").textContent=topicText[r.topic]||"";
+ $("lessonGuide").textContent=lessonGuide[r.topic]||"";
  if(state.role==="student"){
    const my=r.students.find(s=>s?.id===state.playerId);
    state.ready=!!my?.ready;
@@ -614,6 +636,12 @@ function renderCar(car){
  const color=car.slot===0?"#53caff":"#ff79a1";
  ctx.save();ctx.translate(c.x,c.y);ctx.rotate(c.angle);
  if(c.boost){ctx.fillStyle="#ffcb5d";ctx.beginPath();ctx.moveTo(-21,0);ctx.lineTo(-56,-9);ctx.lineTo(-45,0);ctx.lineTo(-56,9);ctx.fill();}
+ // Minimal speed streaks make acceleration visually readable from the fixed camera.
+ if(c.speed>80){
+  const power=Math.min(1,(c.speed-80)/120);
+  ctx.strokeStyle="rgba(162,239,255,"+(.26+.5*power)+")";ctx.lineWidth=2+power*2;
+  for(const y of [-14,0,14]){ctx.beginPath();ctx.moveTo(-33,y);ctx.lineTo(-33-12-power*34,y);ctx.stroke();}
+ }
  if(c.shield){ctx.strokeStyle="#9de9ff";ctx.lineWidth=5;ctx.beginPath();ctx.arc(0,0,33,0,7);ctx.stroke();}
  if(c.grip){ctx.strokeStyle="#79f8b8";ctx.lineWidth=3;ctx.beginPath();ctx.arc(0,0,29,0,7);ctx.stroke();}
  ctx.fillStyle="#091827";ctx.fillRect(-18,-18,30,8);ctx.fillRect(-18,10,30,8);
@@ -652,6 +680,9 @@ function animationFrame(){
  const sorted=[...cars].sort((a,b)=>(b.laps*360+b.progress)-(a.laps*360+a.progress));
  $("lapDisplay").textContent=my?(my.laps+1>r.laps?r.laps:my.laps+1)+"/"+r.laps:"—";
  $("speedDisplay").textContent=String(my?.speed??0);
+ const rescueAvailable=state.role==="student"&&(state.testing||r.phase==="racing")&&!my?.finished;
+ $("rescueButton").hidden=!rescueAvailable;
+ $("rescueButton").disabled=!rescueAvailable||Date.now()-state.lastRescue<1500;
  $("itemDisplay").textContent=my?.item?itemLabels[my.item]:"—";
  $("rankDisplay").textContent=my?String(sorted.findIndex(c=>c.id===my.id)+1)+"/"+cars.length:"—";
 }

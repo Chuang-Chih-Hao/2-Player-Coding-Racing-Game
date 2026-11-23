@@ -15,6 +15,29 @@ test("three actual browser sessions: visual blocks, teacher monitoring, synchron
   await p.locator("#joinButton").click();
   await expect(p.locator("#blocklyDiv .blocklySvg")).toBeVisible();
  }
+ // Student focus is readable without overlapping default stacks or clipped guidance.
+ await expect(a.locator("#helpButton")).toBeVisible();
+ await expect(a.locator("#feedbackPanel")).toBeVisible();
+ const compact=await a.evaluate(()=>{
+  const panel=document.querySelector("#rightPanel").getBoundingClientRect();
+  const help=document.querySelector("#helpButton").getBoundingClientRect();
+  const consoleBox=document.querySelector("#feedbackPanel").getBoundingClientRect();
+  const blocks=Blockly.getMainWorkspace().getTopBlocks(false);
+  const positions=blocks.map(b=>({type:b.type,y:b.getRelativeToSurfaceXY().y,height:b.getHeightWidth().height}));
+  return {panelBottom:panel.bottom,helpBottom:help.bottom,consoleBottom:consoleBox.bottom,
+    positions,collapsed:blocks.filter(b=>b.isCollapsed()).length};
+ });
+ expect(compact.helpBottom).toBeLessThanOrEqual(compact.panelBottom+2);
+ expect(compact.consoleBottom).toBeLessThanOrEqual(compact.panelBottom+2);
+ expect(compact.collapsed).toBeGreaterThanOrEqual(3);
+ const byY=[...compact.positions].sort((a,b)=>a.y-b.y);
+ for(let i=1;i<byY.length;i++)expect(byY[i].y).toBeGreaterThanOrEqual(byY[i-1].y+byY[i-1].height-1);
+ await a.locator("#expandEditor").click();
+ await expect(a.locator("#stage")).toHaveClass(/editor-focus/);
+ expect(await a.locator("#blocklyDiv").evaluate(el=>el.getBoundingClientRect().width)).toBeGreaterThan(700);
+ await a.locator("#arrangeButton").click();
+ await a.locator("#expandEditor").click();
+ await expect(a.locator("#stage")).not.toHaveClass(/editor-focus/);
  await expect(t.locator("#name1")).toContainText("A 車手");
  await expect(t.locator("#name2")).toContainText("B 車手");
  await t.locator("#topicSelect").selectOption("free");
@@ -51,6 +74,15 @@ test("three actual browser sessions: visual blocks, teacher monitoring, synchron
  // A loose block must be connected or deleted before committing. Restore defaults and adjust the one target.
  await a.locator("#resetButton").click();
  await a.evaluate(()=>Blockly.getMainWorkspace().getAllBlocks(false).find(b=>b.type==="act_set_max").setFieldValue("198","VALUE"));
+ await a.locator("#testButton").click();
+ await expect(a.locator("#retryTestButton")).toBeVisible();
+ await a.keyboard.down("ArrowUp");
+ await expect.poll(async()=>Number((await a.locator("#speedDisplay").innerText()).trim())).toBeGreaterThan(0);
+ await a.keyboard.up("ArrowUp");
+ await a.locator("#retryTestButton").click();
+ await expect(a.locator("#toast")).toContainText("回到起點");
+ await a.locator("#stopTestButton").click();
+ await expect(a.locator("#testButton")).toBeVisible();
  await a.locator("#lockButton").click();
  await b.locator("#lockButton").click();
  await expect(t.locator("#startRace")).toBeEnabled();

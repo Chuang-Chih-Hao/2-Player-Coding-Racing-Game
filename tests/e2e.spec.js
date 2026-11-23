@@ -18,6 +18,8 @@ test("three actual browser sessions: visual blocks, teacher monitoring, synchron
  // Student focus is readable without overlapping default stacks or clipped guidance.
  await expect(a.locator("#helpButton")).toBeVisible();
  await expect(a.locator("#feedbackPanel")).toBeVisible();
+ await expect(a.locator("#lessonGuide")).toContainText("最高速度");
+ await expect(a.locator("#blockViewNote")).toContainText("短橘色積木");
  const compact=await a.evaluate(()=>{
   const panel=document.querySelector("#rightPanel").getBoundingClientRect();
   const help=document.querySelector("#helpButton").getBoundingClientRect();
@@ -35,6 +37,11 @@ test("three actual browser sessions: visual blocks, teacher monitoring, synchron
  await a.locator("#expandEditor").click();
  await expect(a.locator("#stage")).toHaveClass(/editor-focus/);
  expect(await a.locator("#blocklyDiv").evaluate(el=>el.getBoundingClientRect().width)).toBeGreaterThan(700);
+ await a.locator("#allBlocksButton").click();
+ await expect(a.locator("#allBlocksButton")).toHaveText("只看本回合");
+ expect(await a.evaluate(()=>Blockly.getMainWorkspace().getTopBlocks(false).filter(b=>b.isCollapsed()).length)).toBe(0);
+ await a.locator("#allBlocksButton").click();
+ await expect(a.locator("#allBlocksButton")).toHaveText("展開全部");
  await a.locator("#arrangeButton").click();
  await a.locator("#expandEditor").click();
  await expect(a.locator("#stage")).not.toHaveClass(/editor-focus/);
@@ -76,6 +83,9 @@ test("three actual browser sessions: visual blocks, teacher monitoring, synchron
  await a.evaluate(()=>Blockly.getMainWorkspace().getAllBlocks(false).find(b=>b.type==="act_set_max").setFieldValue("198","VALUE"));
  await a.locator("#testButton").click();
  await expect(a.locator("#retryTestButton")).toBeVisible();
+ await expect(a.locator("#rescueButton")).toBeVisible();
+ await a.locator("#rescueButton").click();
+ await expect(a.locator("#toast")).toContainText("安全賽道");
  await a.keyboard.down("ArrowUp");
  await expect.poll(async()=>Number((await a.locator("#speedDisplay").innerText()).trim())).toBeGreaterThan(0);
  await a.keyboard.up("ArrowUp");
@@ -93,6 +103,9 @@ test("three actual browser sessions: visual blocks, teacher monitoring, synchron
  await b.keyboard.down("ArrowUp");
  await expect.poll(async()=>Number((await a.locator("#speedDisplay").innerText()).trim())).toBeGreaterThan(0);
  await expect.poll(async()=>Number((await b.locator("#speedDisplay").innerText()).trim())).toBeGreaterThan(0);
+ await expect(a.locator("#rescueButton")).toBeVisible();
+ await a.locator("#rescueButton").click();
+ await expect(a.locator("#toast")).toContainText("回賽道");
  await a.keyboard.up("ArrowUp");await b.keyboard.up("ArrowUp");
  await t.locator("#pauseRace").click();
  await expect(t.locator("#phaseBadge")).toContainText("暫停");

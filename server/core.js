@@ -131,6 +131,25 @@ export function nearest(track,x,y) {
   }
   return {idx,distance:Math.sqrt(best)};
 }
+// A rescue moves the car to the nearest safe road segment without changing its
+// completed laps, Scratch program, checkpoint history or collected items.
+export function rescueCarToTrack(c,track,now=Date.now()) {
+  if(!c||c.finished)return false;
+  const near=nearest(track,c.x,c.y),N=track.path.length;
+  const safe=i=>track.obstacles.every(o=>Math.hypot(track.path[i].x-o.x,track.path[i].y-o.y)>48);
+  let idx=near.idx;
+  if(!safe(idx))for(let k=1;k<40;k++){
+    const a=(near.idx+k)%N,b=(near.idx-k+N)%N;
+    if(safe(a)){idx=a;break;}
+    if(safe(b)){idx=b;break;}
+  }
+  const p=track.path[idx],q=track.path[(idx+3)%N];
+  c.x=p.x;c.y=p.y;c.progress=idx;c.angle=Math.atan2(q.y-p.y,q.x-p.x);
+  c.speed=35;c.offroad=false;c.curve=isCurve(track,idx);
+  c.lastRescue=now;c.rescueShieldUntil=now+1800;c.rescueCount=(c.rescueCount||0)+1;
+  c.lastDiagnostic="已回到賽道！按 ↑ / W 加速，方向鍵轉彎";
+  return true;
+}
 export function isCurve(track,idx) {
   const n=track.path.length, a=track.path[(idx+n-9)%n],b=track.path[idx],c=track.path[(idx+9)%n];
   const ang1=Math.atan2(b.y-a.y,b.x-a.x),ang2=Math.atan2(c.y-b.y,c.x-b.x);
@@ -146,6 +165,7 @@ export function createCar(id,name,slot,track,program=defaultProgram()) {
     ready:false,finished:false,finishedAt:null, collisions:0,avgAccumulator:0,samples:0,
     peak:0,events:0,boostUntil:0,shieldUntil:0,gripUntil:0,jammedUntil:0,
     item:null,itemCount:0,lastHit:0,picked:new Set(),zoneInside:false,
+     rescueCount:0,lastRescue:0,rescueShieldUntil:0,
     input:{up:false,down:false,left:false,right:false},program,
     tuning:{max:150,accel:8,steer:3,brake:5,target:150},
     trace:[],logs:[],lastDiagnostic:"", help:false
@@ -154,7 +174,7 @@ export function createCar(id,name,slot,track,program=defaultProgram()) {
 export function simpleCar(c) {
   return {id:c.id,name:c.name,slot:c.slot,x:c.x,y:c.y,angle:c.angle,speed:Math.round(c.speed),
     progress:c.progress,laps:c.laps,finished:c.finished,finishedAt:c.finishedAt,
-    collisions:c.collisions,average:c.samples?Math.round(c.avgAccumulator/c.samples):0,
+    collisions:c.collisions,rescueCount:c.rescueCount||0,average:c.samples?Math.round(c.avgAccumulator/c.samples):0,
     peak:Math.round(c.peak),events:c.events,item:c.item,ready:c.ready,
     curve:c.curve,offroad:c.offroad,boost:c.boostUntil>0,shield:c.shieldUntil>0,
     grip:c.gripUntil>0,jammed:c.jammedUntil>0,
@@ -236,7 +256,7 @@ export function stepCar(c,track,dt,now,emit=()=>{},difficulty=2) {
     const o=track.obstacles[i];
     if(Math.hypot(c.x-o.x,c.y-o.y)<o.r+10 && now-c.lastHit>1700) {
       c.lastHit=now;
-      if(c.shieldUntil<=now){c.speed*=difficulty===1?.35:difficulty===3?.16:.24;c.collisions++;c.lastDiagnostic="撞到障礙物！可使用條件判斷或防護盾";}
+      if(c.shieldUntil<=now && c.rescueShieldUntil<=now){c.speed*=difficulty===1?.35:difficulty===3?.16:.24;c.collisions++;c.lastDiagnostic="撞到障礙物！可使用條件判斷或防護盾";}
       execute(c,"collision",{collision:true},now,emit);
     }
   }

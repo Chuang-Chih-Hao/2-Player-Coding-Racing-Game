@@ -53,6 +53,7 @@
               <div class="hud-pill"><small>道具</small><b id="itemDisplay">—</b></div>
               <div class="hud-pill"><small>排名</small><b id="rankDisplay">—</b></div>
             </div>
+            <div class="track-legend" aria-label="賽道圖例"><span>⛔ 橘色路障：撞到會減速</span><span>🟨 黃色方塊：拾取道具</span><span>⚡ 青色線段：加速區</span></div>
           </div>
           <div id="trackFooter">
             <div class="pilot-card"><span class="pilot-dot blue"></span><div><strong id="name1">等待學生 A</strong><small id="meta1">未進入</small></div></div>
@@ -62,22 +63,23 @@
         </section>
         <aside id="rightPanel">
           <div id="studentPanel" hidden>
-            <div class="side-title"><div><span class="micro">SCRATCH CODING GARAGE</span><h2>賽車程式調校站</h2></div><span id="missionTag" class="chip">變數任務</span></div>
+            <div class="side-title"><div><span class="micro">SCRATCH CODING GARAGE</span><h2>賽車程式調校站</h2></div><div class="editor-title-actions"><span id="missionTag" class="chip">變數任務</span><button id="expandEditor" class="expand-editor" type="button" aria-pressed="false">⛶ 放大積木</button></div></div>
             <p class="mission" id="missionDescription">修改最高速度，看看車輛表現如何改變。</p>
             <div class="editor-toolbar">
               <button id="undoButton" title="復原">↶ 復原</button><button id="redoButton" title="重做">↷ 重做</button>
-              <button id="resetButton">恢復預設</button><button id="clearButton">清空</button>
+              <button id="arrangeButton" title="重新排列積木，避免重疊">整理積木</button><button id="resetButton">恢復預設</button><button id="clearButton">清空</button>
               <button id="saveButton">儲存</button>
             </div>
             <div id="blocklyDiv"></div>
             <div class="student-actions">
               <button id="testButton" class="secondary">▶ 練習測試</button>
+              <button id="retryTestButton" class="secondary" hidden title="立即將練習賽車送回起跑點，不用再慢慢開回去">↻ 重新練習</button>
               <button id="stopTestButton" class="secondary" hidden>■ 停止測試</button>
               <button id="lockButton" class="primary">✓ 鎖定積木 / 準備</button>
               <button id="unlockButton" class="secondary" hidden>修改積木</button>
-              <button id="helpButton" class="warning">? 請老師協助</button>
+              <button id="helpButton" class="warning" title="向老師發送求助通知，不會自動修改積木">🙋 舉手求助</button>
             </div>
-            <div class="console"><span class="console-title">🧠 程式執行觀察</span><div id="codeFeedback">拖曳積木、修改數值，然後開始測試。</div></div>
+            <details id="feedbackPanel" class="console"><summary class="console-title">📋 積木執行訊息 <small>錯誤、老師提示、程式執行結果，點擊展開</small></summary><div id="codeFeedback" role="status">拖曳積木、修改數值，再按「練習測試」。這裡顯示執行過程與錯誤，不必輸入任何程式碼。</div></details>
           </div>
           <div id="teacherPanel" hidden>
             <div class="side-title"><div><span class="micro">TEACHER CONTROL DECK</span><h2>教師控制台</h2></div><span class="chip">HOST</span></div>

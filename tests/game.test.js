@@ -2,7 +2,7 @@ import test from "node:test";
 import assert from "node:assert/strict";
 import {io as connect} from "socket.io-client";
 import {createGameServer} from "../server/index.js";
-import {createCar,defaultProgram,execute,makeTrack,nearest,stepCar,finishIfNeeded,validateProgram} from "../server/core.js";
+import {createCar,defaultProgram,execute,makeTrack,nearest,rescueCarToTrack,stepCar,finishIfNeeded,validateProgram} from "../server/core.js";
 
 test("safe interpreter validates input, nested conditions, and lesson restrictions",()=>{
  const p=defaultProgram();
@@ -52,6 +52,25 @@ test("a simulated keyboard driver can drive a real checkpointed lap",()=>{
  assert.ok(car.laps>=1,"Keyboard-like steering must complete a real lap; got "+car.laps+" after "+steps+" steps at "+car.x+","+car.y);
  assert.equal(finishIfNeeded(car,1,steps*.05,now),true);
  assert.ok(car.finishedAt>0);
+ assert.ok(car.peak>80,"a real lap must involve a noticeable racing speed; peak="+car.peak);
+ console.log("模擬完整一圈：秒數="+(steps*.05).toFixed(1)+"，極速="+Math.round(car.peak)+"，碰撞="+car.collisions);
+});
+test("repeated road rescues keep progress, avoid obstacles, and restore steering",()=>{
+ const track=makeTrack("rookie"),car=createCar("stranded","Stranded",0,track);
+ const now=Date.now();
+ car.laps=1;car.checkpoint=true;car.progress=180;car.x=500;car.y=343;car.speed=0;
+ assert.equal(rescueCarToTrack(car,track,now),true);
+ assert.equal(car.laps,1);assert.equal(car.checkpoint,true);
+ assert.ok(nearest(track,car.x,car.y).distance<1);
+ assert.equal(car.rescueCount,1);assert.equal(car.speed,35);
+ assert.ok(track.obstacles.every(o=>Math.hypot(o.x-car.x,o.y-car.y)>48));
+ car.x=480;car.y=300;car.speed=0;
+ assert.equal(rescueCarToTrack(car,track,now+1800),true);
+ assert.equal(car.rescueCount,2);assert.equal(car.laps,1);
+ assert.ok(nearest(track,car.x,car.y).distance<1);
+ car.input.up=true;execute(car,"start",{},now);
+ stepCar(car,track,.05,now+1900);
+ assert.ok(car.speed>35,"car must drive again immediately after rescue");
 });
 test("Socket.IO two-player room, permissions, program locking, race, reconnect and report",async(t)=>{
  const game=createGameServer();
@@ -76,6 +95,8 @@ test("Socket.IO two-player room, permissions, program locking, race, reconnect a
  assert.equal(A.ok,true);assert.equal(B.ok,true);assert.notEqual(A.playerId,B.playerId);
  const denied=await emit(outsider,"room:join",{code:created.code,name:"第三人"});assert.equal(denied.ok,false);
  const illegal=await emit(studentA,"teacher:race",{action:"restart"});assert.equal(illegal.ok,false);
+ assert.equal((await emit(outsider,"student:rescue")).ok,false);
+ assert.equal((await emit(studentA,"student:rescue")).ok,false);
  const update=await emit(teacher,"teacher:set",{topic:"max",track:"rookie",laps:1});assert.equal(update.ok,true);
  const p1=defaultProgram(),p2=defaultProgram();p1[0].body[0].value=175;p2[0].body[0].value=90;
  assert.equal((await emit(studentA,"program:draft",{program:p1})).ok,true);
@@ -92,7 +113,12 @@ test("Socket.IO two-player room, permissions, program locking, race, reconnect a
  await new Promise(r=>setTimeout(r,800));
  assert.ok(room.cars[0].speed>0);
  assert.ok(room.cars[1].speed>0);
+ const rescued=await emit(studentA,"student:rescue");
+ assert.equal(rescued.ok,true);assert.equal(rescued.rescueCount,1);
+ assert.ok(nearest(makeTrack(room.track),room.cars[0].x,room.cars[0].y).distance<10);
+ assert.equal((await emit(studentA,"student:rescue")).ok,false,"cooldown prevents rapid abuse");
  assert.equal((await emit(teacher,"teacher:race",{action:"pause"})).ok,true);
+ assert.equal((await emit(studentA,"student:rescue")).ok,false,"rescue is paused along with race");
  assert.equal(room.phase,"paused");
  assert.equal((await emit(teacher,"teacher:race",{action:"resume"})).ok,true);
  assert.equal((await emit(teacher,"teacher:race",{action:"finish"})).ok,true);
@@ -107,6 +133,11 @@ test("Socket.IO two-player room, permissions, program locking, race, reconnect a
  const returning=await emit(rejoined,"room:join",{code:created.code,token:A.token});
  assert.equal(returning.ok,true);assert.equal(returning.playerId,"p1");
  assert.equal(room.students[0].socketId,rejoined.id);
+ const practice=await emit(rejoined,"student:test",{program:room.students[0].draft});
+ assert.equal(practice.ok,true);
+ assert.equal((await emit(rejoined,"student:rescue")).ok,true,"practice rescue is permitted");
+ assert.equal(room.students[0].practice.rescueCount,1);
+ assert.equal((await emit(rejoined,"student:test",{stop:true})).ok,true);
  const fake=await emit(outsider,"teacher:hint",{playerId:"p1",message:"x"});
  assert.equal(fake.ok,false);
 });

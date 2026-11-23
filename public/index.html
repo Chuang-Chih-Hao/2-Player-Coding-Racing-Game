@@ -52,28 +52,30 @@
               <div class="hud-pill"><small>目前速度</small><b id="speedDisplay">0</b><small>km/h</small></div>
               <div class="hud-pill"><small>道具</small><b id="itemDisplay">—</b></div>
               <div class="hud-pill"><small>排名</small><b id="rankDisplay">—</b></div>
+              <button id="rescueButton" class="rescue-track" hidden title="把車移回最近的安全賽道，可重複使用（快捷鍵 R）">↪ 回賽道 <kbd>R</kbd></button>
             </div>
             <div class="track-legend" aria-label="賽道圖例"><span>⛔ 橘色路障：撞到會減速</span><span>🟨 黃色方塊：拾取道具</span><span>⚡ 青色線段：加速區</span></div>
           </div>
           <div id="trackFooter">
             <div class="pilot-card"><span class="pilot-dot blue"></span><div><strong id="name1">等待學生 A</strong><small id="meta1">未進入</small></div></div>
             <div class="pilot-card"><span class="pilot-dot pink"></span><div><strong id="name2">等待學生 B</strong><small id="meta2">未進入</small></div></div>
-            <div class="driver-key" id="driverHint">駕駛：方向鍵 / WASD · 空白鍵：使用道具</div>
+            <div class="driver-key" id="driverHint">方向鍵 / WASD 駕駛 · R 回賽道 · 空白鍵道具</div>
           </div>
         </section>
         <aside id="rightPanel">
           <div id="studentPanel" hidden>
             <div class="side-title"><div><span class="micro">SCRATCH CODING GARAGE</span><h2>賽車程式調校站</h2></div><div class="editor-title-actions"><span id="missionTag" class="chip">變數任務</span><button id="expandEditor" class="expand-editor" type="button" aria-pressed="false">⛶ 放大積木</button></div></div>
             <p class="mission" id="missionDescription">修改最高速度，看看車輛表現如何改變。</p>
+            <div class="learning-guide"><strong id="lessonGuide">找到「當比賽開始時」裡的速度積木，點白色數字修改。</strong><span id="blockViewNote">其他功能會收成短橘色積木，並沒有刪除，點一下可展開。</span></div>
             <div class="editor-toolbar">
               <button id="undoButton" title="復原">↶ 復原</button><button id="redoButton" title="重做">↷ 重做</button>
-              <button id="arrangeButton" title="重新排列積木，避免重疊">整理積木</button><button id="resetButton">恢復預設</button><button id="clearButton">清空</button>
+              <button id="arrangeButton" title="重新排列積木，避免重疊">整理積木</button><button id="allBlocksButton" title="顯示或收合其餘事件積木">展開全部</button><button id="resetButton">恢復預設</button><button id="clearButton">清空</button>
               <button id="saveButton">儲存</button>
             </div>
             <div id="blocklyDiv"></div>
             <div class="student-actions">
               <button id="testButton" class="secondary">▶ 練習測試</button>
-              <button id="retryTestButton" class="secondary" hidden title="立即將練習賽車送回起跑點，不用再慢慢開回去">↻ 重新練習</button>
+              <button id="retryTestButton" class="secondary" hidden title="把練習回合從起點重來，保留程式">↻ 從起點重練</button>
               <button id="stopTestButton" class="secondary" hidden>■ 停止測試</button>
               <button id="lockButton" class="primary">✓ 鎖定積木 / 準備</button>
               <button id="unlockButton" class="secondary" hidden>修改積木</button>

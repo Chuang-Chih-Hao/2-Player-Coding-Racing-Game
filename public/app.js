@@ -1,4 +1,5 @@
 /* 雙人程式賽車：學生只接觸彩色 Blockly 積木，從不執行積木產生的 JavaScript。 */
+import {RENDER_DELAY_MS,pushMotion,sampleMotion} from './motion.js';
 const $=id=>document.getElementById(id);
 const roomNames={rookie:"新手練習賽道",curves:"彎道技術賽道",items:"道具競速賽道"};
 const topicText={
@@ -21,11 +22,35 @@ const eventLabels={start:"當比賽開始時",line:"當通過起跑線時",curve
  collision:"當碰到障礙物時",pickup:"當取得道具時",boost_zone:"當進入加速區時",key:"當按下指定按鍵時",finish:"當通過終點線時"};
 const conditionLabels={curve:"目前在彎道",speed_gt:"速度大於",collision:"碰到障礙物",has_item:"有道具",obstacle_near:"距離障礙物小於",item_kind:"道具種類等於"};
 const itemLabels={nitro:"氮氣加速",shield:"防護盾",grip:"抓地力",jammer:"干擾器"};
+const eventMeanings={
+ start:"賽車開始時執行一次下方指令。預設會設定最高速度、加速度、轉向與煞車。",
+ line:"完成一圈通過起跑線時才執行，適合設定每圈的變化。",
+ curve_enter:"車子開進彎道時才執行，例如把「目標速度」調低，減少衝出彎道。",
+ curve_leave:"離開彎道回到直線時執行，預設會把目標速度恢復為 230。",
+ collision:"車子碰撞橘色路障時觸發，可以設定碰撞後要做的反應。",
+ pickup:"碰到賽道上的黃色道具方塊時觸發；預設會播放提示音。",
+ boost_zone:"經過賽道上的青色加速區時觸發。",
+ key:"玩家按下這個積木指定的按鍵時才執行，預設空白鍵會嘗試使用道具。",
+ finish:"車子跑完設定圈數後執行一次。"
+};
+function explainBlocklyBlock(block){
+ if(!block)return "🟨 黃色積木是事件：發生指定情況才執行裡面的動作。";
+ if(block.type.startsWith("event_"))return "🟨 事件｜"+eventMeanings[block.type.slice(6)]+(block.isCollapsed()?" 目前已收合；按上方「展開全部」查看裡面的指令。":"");
+ if(block.type.startsWith("act_")){
+  const op=block.type.slice(4);
+  if(op==="use_item")return "🟪 道具｜使用目前攜帶的道具；必須先撿到道具才有作用。";
+  if(op==="play_sound")return "🟪 音效｜觸發此事件時播放提示音，不會改變賽車速度。";
+  return "🟧 設定動作｜"+opLabels[op]+"會改變賽車的能力或目前速度；點白色數字修改。";
+ }
+ if(block.type==="ctrl_ifelse")return "🟦 如果／否則｜先檢查綠色條件，成立做「那麼」，不成立做「否則」。";
+ if(block.type.startsWith("cond_"))return "🟩 偵測條件｜判斷「"+conditionLabels[block.type.slice(5)]+"」是否成立，交給藍色的「如果／否則」決定下一步。";
+ return "選取不同顏色的積木，可以在這裡查看用途。";
+}
 const socket=io({reconnection:true,reconnectionDelay:500});
 const state={role:null,code:null,token:null,playerId:null,room:null,
   workspace:null,monitor:null,selected:"p1",markBlockId:null,visual:new Map(),cars:[],practice:null,testing:false,
   lastProgramStr:"",lastTeacherProgramStr:"",suppress:false,ready:false,connected:false,topicShown:null,
-  lastTrace:"",lastServerError:"",blocksMode:"focus",lastRescue:0};
+  lastTrace:"",lastServerError:"",blocksMode:"focus",lastRescue:0,clockOffset:NaN,renderPhase:null};
 const canvas=$("raceCanvas"),ctx=canvas.getContext("2d");
 const localKey="coding-racing-session-v1";
 function toast(message,ms=2700){
@@ -108,13 +133,13 @@ try{
 function defineBlockly(){
  if(!window.Blockly){toast("Blockly 程式庫載入失敗，請確認網路或重新整理");return false;}
  if(Blockly.Blocks.event_start)return true;
- const eventColor="#f0af36",variableColor="#fb913a",controlColor="#fcbb42",conditionColor="#59a46f",actionColor="#8c67d7";
+ const eventColor="#f0af36",variableColor="#fb913a",controlColor="#5987d5",conditionColor="#59a46f",actionColor="#8c67d7";
  for(const [event,label]of Object.entries(eventLabels)){
    Blockly.Blocks["event_"+event]={init:function(){
      this.appendDummyInput().appendField(label);
      if(event==="key")this.appendDummyInput().appendField(new Blockly.FieldDropdown([["空白鍵","Space"],["Shift","Shift"],["E","e"]]),"KEY");
      this.appendStatementInput("BODY").setCheck("Action");
-     this.setColour(eventColor);this.setTooltip("發生事件時，依序執行裡面的程式");
+     this.setColour(eventColor);this.setTooltip(eventMeanings[event]+"（黃色是「觸發時機」，不是速度數值）");
    }};
  }
  for(const [op,label]of Object.entries(opLabels)){
@@ -153,11 +178,11 @@ function defineBlockly(){
 }
 function toolbox(topic="free"){
  const categories=[
-  {kind:"category",name:"事件",colour:"#f0af36",contents:Object.keys(eventLabels).map(k=>({kind:"block",type:"event_"+k}))},
-  {kind:"category",name:"變數",colour:"#fb913a",contents:Object.keys(params).map(k=>({kind:"block",type:"act_"+k}))},
-  {kind:"category",name:"控制",colour:"#fcbb42",contents:[{kind:"block",type:"ctrl_ifelse"}]},
-  {kind:"category",name:"偵測",colour:"#59a46f",contents:Object.keys(conditionLabels).map(k=>({kind:"block",type:"cond_"+k}))},
-  {kind:"category",name:"道具",colour:"#8c67d7",contents:[{kind:"block",type:"act_use_item"},{kind:"block",type:"act_play_sound"}]}
+  {kind:"category",name:"事件（何時執行）",colour:"#f0af36",contents:Object.keys(eventLabels).map(k=>({kind:"block",type:"event_"+k}))},
+  {kind:"category",name:"變數（改數字）",colour:"#fb913a",contents:Object.keys(params).map(k=>({kind:"block",type:"act_"+k}))},
+  {kind:"category",name:"控制（如果）",colour:"#5987d5",contents:[{kind:"block",type:"ctrl_ifelse"}]},
+  {kind:"category",name:"偵測（條件）",colour:"#59a46f",contents:Object.keys(conditionLabels).map(k=>({kind:"block",type:"cond_"+k}))},
+  {kind:"category",name:"道具／音效",colour:"#8c67d7",contents:[{kind:"block",type:"act_use_item"},{kind:"block",type:"act_play_sound"}]}
  ];
  if(topic==="max"||topic==="accel")return {kind:"categoryToolbox",contents:[categories[1]]};
  if(topic==="curve")return {kind:"categoryToolbox",contents:[categories[0],categories[2],categories[3],categories[1]]};
@@ -171,6 +196,11 @@ function initBlockly(){
    zoom:{controls:true,wheel:true,startScale:.77,maxScale:1.8,minScale:.4,scaleSpeed:1.15},
    move:{scrollbars:true,drag:true,wheel:true},sounds:false,renderer:"zelos",theme:Blockly.Themes.Classic});
  state.workspace.addChangeListener(e=>{
+   if(e.type===Blockly.Events.SELECTED){
+     const block=e.newElementId?state.workspace.getBlockById(e.newElementId):null;
+     $("selectedBlockHelp").textContent=explainBlocklyBlock(block);
+     return;
+   }
    if(state.suppress||e.type===Blockly.Events.UI||e.isUiEvent)return;
    clearTimeout(initBlockly.timer);
    initBlockly.timer=setTimeout(sendDraft,430);
@@ -329,7 +359,7 @@ $("arrangeButton").onclick=()=>{arrangeBlocks();toast("積木已整理，不會�
 $("allBlocksButton").onclick=()=>{
  state.blocksMode=state.blocksMode==="all"?"focus":"all";
  $("allBlocksButton").textContent=state.blocksMode==="all"?"只看本回合":"展開全部";
- $("blockViewNote").textContent=state.blocksMode==="all"?"全部事件積木已展開，可以上下捲動查看；按「只看本回合」會收起其他功能。":"其他功能收成短橘色積木，並沒有刪除；點一下也能展開。";
+ $("blockViewNote").textContent=state.blocksMode==="all"?"全部事件積木已展開，可以上下捲動查看；按「只看本回合」會收起其他功能。":"其他黃色事件收成一行，並沒有刪除；按「展開全部」查看裡面的動作。";
  arrangeBlocks();
  toast(state.blocksMode==="all"?"全部積木已展開，可以上下捲動":"已收起其他功能，保留本回合積木");
 };
@@ -368,7 +398,7 @@ async function stopTest(){
 }
 $("helpButton").onclick=async()=>{if(await call("student:help")){toast("已向老師舉手求助，老師可查看你的積木");explain("已向老師發出求助通知。這裡會顯示積木執行紀錄、錯誤及老師提示。");}};
 socket.on("practice:stopped",()=>{state.testing=false;state.practice=null;$("stopTestButton").hidden=true;$("retryTestButton").hidden=true;$("testButton").hidden=false;toast("老師已暫停你的練習");});
-socket.on("practice:update",data=>{state.practice=data;});
+socket.on("practice:update",data=>{state.practice=data;recordMotion(data,data.at);});
 socket.on("program:replace",data=>{if(state.role==="student"){state.ready=false;loadProgram(data.program);explain(data.reason);toast(data.reason);}});
 socket.on("teacher:message",item=>{
  toast("老師："+item.text,6500);explain("老師提示："+item.text);
@@ -419,19 +449,26 @@ document.addEventListener("keyup",e=>{
 window.addEventListener("blur",()=>{for(const k of Object.keys(input))input[k]=false;sendInput();});
 socket.on("room:update",room=>{state.room=room;updateRoom();});
 socket.on("teacher:update",room=>{if(state.role==="teacher"){state.room=room;updateRoom();}});
+function recordMotion(car,at){
+ const stamp=Number(at)||Date.now();
+ const offset=performance.now()-stamp;
+ if(!Number.isFinite(state.clockOffset))state.clockOffset=offset;
+ else state.clockOffset+=Math.max(-8,Math.min(8,offset-state.clockOffset))*.12;
+ state.visual.set(car.id,pushMotion(state.visual.get(car.id),car,stamp));
+}
 socket.on("race:snapshot",snap=>{
  if(state.room){state.room.phase=snap.phase;state.room.elapsed=snap.elapsed;state.room.countdownAt=snap.countdownAt;}
  state.cars=snap.cars;
  const ids=new Set(snap.cars.map(c=>c.id));
- for(const c of snap.cars){
-   const old=state.visual.get(c.id);
-   if(!old)state.visual.set(c.id,{...c});
-   else{old.tx=c.x;old.ty=c.y;old.ta=c.angle;old.other=c;}
- }
- for(const key of state.visual.keys())if(!ids.has(key))state.visual.delete(key);
+ for(const c of snap.cars)recordMotion(c,snap.at);
+ for(const id of state.visual.keys())if(!ids.has(id))state.visual.delete(id);
 });
 function updateRoom(){
  const r=state.room;if(!r)return;
+ if(r.phase!==state.renderPhase){
+  if(r.phase==="countdown"){state.visual.clear();state.cars=[];}
+  state.renderPhase=r.phase;
+ }
  // Previous race snapshots must not leave a stranded-looking ghost car in a new lesson.
  if(r.phase==="tuning"&&(!r.cars||!r.cars.length)&&state.cars.length){state.cars=[];state.visual.clear();}
  $("roomBadge").textContent="房間 "+r.code;
@@ -441,6 +478,7 @@ function updateRoom(){
  $("missionTag").textContent=(r.topic==="free"?"自由設計":r.topic==="curve"?"條件判斷":r.topic==="item"?"事件觸發":"變數任務");
  $("missionDescription").textContent=topicText[r.topic]||"";
  $("lessonGuide").textContent=lessonGuide[r.topic]||"";
+ if(state.role==="student")$("selectedBlockHelp").textContent=state.workspace?explainBlocklyBlock(state.workspace.getSelected()):"🟨 黃色積木是事件：發生指定情況才執行裡面的動作。";
  if(state.role==="student"){
    const my=r.students.find(s=>s?.id===state.playerId);
    state.ready=!!my?.ready;

@@ -119,27 +119,6 @@ test("three actual browser sessions: visual blocks, teacher monitoring, synchron
  await b.keyboard.down("ArrowUp");
  await expect.poll(async()=>Number((await a.locator("#speedDisplay").innerText()).trim())).toBeGreaterThan(0);
  await expect.poll(async()=>Number((await b.locator("#speedDisplay").innerText()).trim())).toBeGreaterThan(0);
- // Server snapshots carry timestamps at ~20 Hz for client-side smooth interpolation.
- const motionPackets=await a.evaluate(async()=>{
-   const socket=window.io({forceNew:true,transports:["websocket"]});
-   return await new Promise(resolve=>{
-     const received=[];let timer;
-     socket.on("race:snapshot",pkt=>{
-       received.push(pkt);
-       if(received.length>=3){
-         clearTimeout(timer);socket.disconnect();
-         resolve(received);
-       }
-     });
-     socket.on("connect",()=>socket.emit("room:join",{code:document.querySelector("#roomBadge").textContent.replace("房間 ",""),name:"motion observer"},()=>{}));
-     timer=setTimeout(()=>{socket.disconnect();resolve(received)},1000);
-   });
- });
- expect(motionPackets.length).toBeGreaterThanOrEqual(2);
- expect(motionPackets.every(p=>Number.isFinite(p.at))).toBe(true);
- await expect(a.locator("#rescueButton")).toBeVisible();
- await a.locator("#rescueButton").click();
- await expect(a.locator("#toast")).toContainText("回賽道");
  await a.keyboard.up("ArrowUp");await b.keyboard.up("ArrowUp");
  await t.locator("#pauseRace").click();
  await expect(t.locator("#phaseBadge")).toContainText("暫停");

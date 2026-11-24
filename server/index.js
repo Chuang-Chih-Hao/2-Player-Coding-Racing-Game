@@ -248,7 +248,7 @@ export function createGameServer(options={}) {
       if(now-car.lastRescue<1500)return error(ack,"稍等一下再回賽道");
       rescueCarToTrack(car,makeTrack(room.track),now);
       if(practice){if(s.socketId)io.to(s.socketId).emit("practice:update",simpleCar(car));}
-      else io.to(room.code).emit("race:snapshot",{phase:room.phase,elapsed:room.elapsed,countdownAt:room.countdownAt,cars:room.cars.map(simpleCar)});
+      else io.to(room.code).emit("race:snapshot",{phase:room.phase,elapsed:room.elapsed,at:now,countdownAt:room.countdownAt,cars:room.cars.map(simpleCar)});
       okay(ack,{rescueCount:car.rescueCount});
     });
     socket.on("student:test",(data={},ack)=>{
@@ -384,11 +384,11 @@ export function createGameServer(options={}) {
         room.students.forEach(s=>{
           if(!s?.practice)return;
           stepCar(s.practice,track,dt,now,entry=>trace(room,s.practice,entry),room.difficulty);
-          if(ticks%3===0 && s.socketId)io.to(s.socketId).emit("practice:update",simpleCar(s.practice));
+          if(s.socketId)io.to(s.socketId).emit("practice:update",{...simpleCar(s.practice),at:now});
         });
       }
-      if(ticks%2===0&&["racing","paused","countdown"].includes(room.phase)){
-        io.to(room.code).emit("race:snapshot",{phase:room.phase,elapsed:room.elapsed,
+      if(["racing","paused","countdown"].includes(room.phase)){
+        io.to(room.code).emit("race:snapshot",{phase:room.phase,elapsed:room.elapsed,at:now,
           countdownAt:room.countdownAt,cars:room.cars.map(simpleCar)});
       }
     }

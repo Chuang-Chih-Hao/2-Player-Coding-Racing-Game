@@ -191,3 +191,10 @@ Render 免費服務可能休眠；休眠或重新部署會失去記憶體內房�
 - 加入學生練習、程式鎖定、雙人同步、重進房間、固定 1600×900 等比例縮放。
 - 加入 GitHub Actions CI、Node 單元與多人 Socket.IO 測試、Playwright 三頁瀏覽器流程。
 - 尚有限制：房間／成績僅存 RAM；無完整 Scratch 程式語言相容性；變數監測與教師長期帳號管理仍可擴充。完整狀態應參照最新 CI 與 Render 部署資訊。
+
+### v1.0.5 — 2026-11-24（街機競速與真正可編輯的事件）
+- 參考 Mario Kart World 的新手輔助、Trackmania 的快速重試，以及 Daytona USA 的圈數、速度、排名等競速 HUD。新增賽道方向箭頭、黑白起終點、試駕入口、速度條、離路／道具／彎道提示。
+- 課程主題改為建議任務，不再拒絕合法的積木新增、刪除或結構調整。所有回合完整開放事件、動作、控制、偵測、道具分類；新增事件下拉選單及刪除選取積木按鈕。初階預設只有起跑事件；彎道、道具回合才載入相關示例。不再自動收合未使用的事件。
+- 入門難度增加道路邊緣的輕微轉向輔助，玩家主動轉向時不干預；未自訂任何按鍵事件時空白鍵仍可使用道具，自訂按鍵後則依積木執行。
+- 保留老師準備、開始、暫停及多人同步；保留 R 快速回賽道。新增真實事件效果及增刪測試。
+- 參考資料：https://en-americas-support.nintendo.com/app/answers/detail/a_id/68611/ ； https://news.ubisoft.com/en-us/article/31ZNGwlldXOtDzLdapSG3k/trackmania-defy-gravity-at-high-speeds-on-july-1 ； https://manuals.plus/m/980050143a6be6d0a4affa4edf7213e40b6a84ef47a033f6ac56ee4d640f2b99

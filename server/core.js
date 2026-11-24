@@ -14,8 +14,8 @@ export const ACTIONS = [...Object.keys(PARAMS), "use_item", "play_sound"];
 export const ITEMS = ["nitro", "shield", "grip", "jammer"];
 export const clamp = (n, a, b) => Math.min(b, Math.max(a, n));
 
-export function defaultProgram() {
-  return [
+export function defaultProgram(topic="free") {
+  const all=[
     {type:"event",event:"start",id:"default-start",body:[
       {type:"action",op:"set_max",value:150,id:"default-max"},
       {type:"action",op:"set_accel",value:8,id:"default-accel"},
@@ -39,6 +39,12 @@ export function defaultProgram() {
       {type:"action",op:"play_sound",id:"default-sound"}
     ]}
   ];
+  if(topic==="free")return all;
+  const start=all[0];
+  start.body=start.body.filter(n=>n.op==="set_max"||n.op==="set_accel");
+  if(topic==="curve")return [start,all[1],all[2]];
+  if(topic==="item")return [start,all[3],all[4]];
+  return [start];
 }
 function fail(message) { throw new Error(message); }
 export function validateProgram(source, topic="free") {
@@ -78,29 +84,7 @@ export function validateProgram(source, topic="free") {
     body(e.body,0);
   }
   if(topic!=="free" && !Object.hasOwn(TOPICS,topic)) fail("未知的課程主題");
-  if(topic!=="free") {
-    // Compare the code's syntax tree to the baseline, allowing only the assigned learning target.
-    const normalized=(v)=>{
-      if(Array.isArray(v))return v.map(normalized);
-      if(v && typeof v==="object") {
-        const out={};
-        for(const k of Object.keys(v).sort())if(k!=="id")out[k]=normalized(v[k]);
-        return out;
-      }
-      return v;
-    };
-    const copy=normalized(source), baseline=normalized(defaultProgram());
-    if(topic==="max" || topic==="accel") {
-      const op=topic==="max"?"set_max":"set_accel";
-      const change=(tree)=>{for(const e of tree)for(const n of e.body||[])if(n.op===op)n.value="EDITABLE";};
-      change(copy);change(baseline);
-      if(JSON.stringify(copy)!==JSON.stringify(baseline)) fail("本回合只能修改指定的 " + TOPICS[topic] + " 積木；其他積木請保留原樣");
-    } else {
-      const eventAllowed=topic==="curve"?["curve_enter"]:["pickup","key"];
-      const scrub=(tree)=>tree.map(e=>eventAllowed.includes(e.event)?{event:e.event,type:"event",key:e.key||null}:e);
-      if(JSON.stringify(scrub(copy))!==JSON.stringify(scrub(baseline)))fail("本回合僅能修改指定事件的積木，其他設定請保留原樣");
-    }
-  }
+  // Topics are suggested experiments, not restrictions on legal Blockly programs.
   return JSON.parse(JSON.stringify(source));
 }
 export function makeTrack(which="rookie") {
@@ -167,7 +151,7 @@ export function createCar(id,name,slot,track,program=defaultProgram()) {
     item:null,itemCount:0,lastHit:0,picked:new Set(),zoneInside:false,
      rescueCount:0,lastRescue:0,rescueShieldUntil:0,
     input:{up:false,down:false,left:false,right:false},program,
-    tuning:{max:150,accel:8,steer:3,brake:5,target:150},
+    tuning:{max:150,accel:8,steer:3,brake:5,target:230},
     trace:[],logs:[],lastDiagnostic:"", help:false
   };
 }
@@ -183,6 +167,8 @@ export function simpleCar(c) {
 }
 export function execute(c,event,ctx={},now=Date.now(),emit=()=>{}) {
   const matched=c.program.filter(e=>e.event===event && (event!=="key"||e.key===ctx.key));
+  if(event==="key"&&ctx.key==="Space"&&!c.program.some(e=>e.event==="key")&&c.item)
+    matched.push({id:"builtin-space",body:[{id:"builtin-item",type:"action",op:"use_item"}]});
   for(const evt of matched) {
     let steps=0;
     function log(n,message) {
@@ -240,6 +226,13 @@ export function stepCar(c,track,dt,now,emit=()=>{},difficulty=2) {
   c.speed=clamp(c.speed,0,Math.max(35,max));
   const turn=(Number(c.input.right)-Number(c.input.left));
   c.angle+=turn*c.tuning.steer*.57*dt*(.35+.65*Math.min(1,c.speed/110))*(jammed?.55:1);
+  // Beginner steering assist yields immediately to manual steering.
+  if(difficulty===1&&turn===0&&c.speed>12&&!jammed&&near0.distance>track.width*.29&&near0.distance<track.width*.95){
+    const ahead=track.path[(near0.idx+10)%track.path.length];
+    const desired=Math.atan2(ahead.y-c.y,ahead.x-c.x);
+    const delta=Math.atan2(Math.sin(desired-c.angle),Math.cos(desired-c.angle));
+    c.angle+=clamp(delta,-.85,.85)*Math.min(1,dt*2.6);
+  }
   const gripFactor=gripped?1:Math.max(.7,1-(c.tuning.steer-3)*.055);
   c.x+=Math.cos(c.angle)*c.speed*dt*gripFactor;
   c.y+=Math.sin(c.angle)*c.speed*dt*gripFactor;

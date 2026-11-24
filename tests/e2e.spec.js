@@ -27,7 +27,7 @@ test("three actual browser sessions: visual blocks, teacher monitoring, synchron
     yellowEvents:w.getTopBlocks(false).filter(x=>x.type.startsWith("event_")).length};
  });
  expect(blockHelp.tooltip).toContain("賽車開始時");
- expect(blockHelp.yellowEvents).toBeGreaterThan(2);
+ expect(blockHelp.yellowEvents).toBe(1);
  const freshMotion=await a.evaluate(async()=>{
    const {pushMotion,sampleMotion}=await import("/motion.js");
    let q=pushMotion([],{x:0,y:0,angle:0,speed:80},1000);
@@ -47,20 +47,21 @@ test("three actual browser sessions: visual blocks, teacher monitoring, synchron
  });
  expect(compact.helpBottom).toBeLessThanOrEqual(compact.panelBottom+2);
  expect(compact.consoleBottom).toBeLessThanOrEqual(compact.panelBottom+2);
- expect(compact.collapsed).toBeGreaterThanOrEqual(3);
+ expect(compact.collapsed).toBe(0);
  const byY=[...compact.positions].sort((a,b)=>a.y-b.y);
  for(let i=1;i<byY.length;i++)expect(byY[i].y).toBeGreaterThanOrEqual(byY[i-1].y+byY[i-1].height-1);
  await a.locator("#expandEditor").click();
  await expect(a.locator("#stage")).toHaveClass(/editor-focus/);
  expect(await a.locator("#blocklyDiv").evaluate(el=>el.getBoundingClientRect().width)).toBeGreaterThan(700);
- await a.locator("#allBlocksButton").click();
- await expect(a.locator("#allBlocksButton")).toHaveText("只看本回合");
- expect(await a.evaluate(()=>Blockly.getMainWorkspace().getTopBlocks(false).filter(b=>b.isCollapsed()).length)).toBe(0);
- await a.locator("#allBlocksButton").click();
- await expect(a.locator("#allBlocksButton")).toHaveText("展開全部");
+ await a.locator("#eventType").selectOption("pickup");
+ await a.locator("#addEventButton").click();
+ await expect.poll(()=>a.evaluate(()=>Blockly.getMainWorkspace().getTopBlocks(false).some(b=>b.type==="event_pickup"))).toBe(true);
+ await a.locator("#deleteBlockButton").click();
+ await expect.poll(()=>a.evaluate(()=>Blockly.getMainWorkspace().getTopBlocks(false).some(b=>b.type==="event_pickup"))).toBe(false);
  await a.locator("#arrangeButton").click();
  await a.locator("#expandEditor").click();
  await expect(a.locator("#stage")).not.toHaveClass(/editor-focus/);
+ await expect(a.locator("#quickDrive")).toBeVisible();
  await expect(t.locator("#name1")).toContainText("A 車手");
  await expect(t.locator("#name2")).toContainText("B 車手");
  await t.locator("#topicSelect").selectOption("free");

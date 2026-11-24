@@ -132,7 +132,7 @@ export function createGameServer(options={}) {
         const id="p"+(slot+1);
         room.students[slot]={id,slot,name:cleanName(data.name),token:secret(),
           socketId:null,ready:false,locked:false,help:false,
-          draft:defaultProgram(),program:defaultProgram(),version:0,
+          draft:defaultProgram(room.topic),program:defaultProgram(room.topic),version:0,
           attempts:0,errors:0,fixes:0,lastError:"",modified:[],practice:null};
       }
       const student=room.students[slot];
@@ -165,7 +165,7 @@ export function createGameServer(options={}) {
         room.difficulty=data.difficulty;
       }
       if(topicChanged) {
-        room.students.forEach(s=>{if(s){s.locked=false;s.ready=false;s.draft=defaultProgram();s.program=defaultProgram();s.version++;if(s.socketId)io.to(s.socketId).emit("program:replace",{program:s.draft,reason:"老師已切換主題，載入預設積木"});}});
+        room.students.forEach(s=>{if(s){s.locked=false;s.ready=false;s.draft=defaultProgram(room.topic);s.program=defaultProgram(room.topic);s.version++;if(s.socketId)io.to(s.socketId).emit("program:replace",{program:s.draft,reason:"老師已切換主題，載入預設積木"});}});
       }
       room.version++;okay(ack,{room:view(room,true)});notify(io,room);
     });
@@ -175,7 +175,7 @@ export function createGameServer(options={}) {
       if(!["tuning","results"].includes(room.phase)||s.locked)return error(ack,"程式已鎖定或賽車正在進行");
       try {
         const draft=validateProgram(data.program,room.topic);
-        s.draft=draft;s.version++;s.lastError="";s.modified=calculateModified(draft);
+        s.draft=draft;s.version++;s.lastError="";s.modified=calculateModified(draft,room.topic);
         if(s.errors>0)s.fixes++;okay(ack,{version:s.version});
         notify(io,room);
       }catch(e){s.errors++;s.lastError=e.message;error(ack,e.message);notify(io,room);}
@@ -187,7 +187,7 @@ export function createGameServer(options={}) {
       try {
         const validated=validateProgram(data.program,room.topic);
         s.draft=validated;s.program=clone(validated);s.locked=true;s.ready=true;
-        s.attempts++;s.modified=calculateModified(validated);s.version++;
+        s.attempts++;s.modified=calculateModified(validated,room.topic);s.version++;
         okay(ack,{ready:true});notify(io,room);
       }catch(e){s.errors++;s.lastError=e.message;error(ack,e.message);notify(io,room);}
     });
@@ -291,10 +291,10 @@ export function createGameServer(options={}) {
       const candidate=clone(s.draft);
       let done=false;
       function edit(arr){for(const n of arr){if(n.type==="action"&&n.op===data.op&&!done){n.value=value;done=true;}if(n.type==="if"){edit(n.then);edit(n.else);}}}
-      candidate.filter(e=>room.topic==="curve"?e.event==="curve_enter":room.topic==="item"?["pickup","key"].includes(e.event):true).forEach(e=>edit(e.body));
+      candidate.forEach(e=>edit(e.body));
       if(!done)return error(ack,"學生尚未放置這個數值積木");
       try{s.draft=validateProgram(candidate,room.topic);s.locked=false;s.ready=false;
-        s.version++;s.modified=calculateModified(s.draft);
+        s.version++;s.modified=calculateModified(s.draft,room.topic);
         const reason="老師協助修改了 " + data.op + " → " + value;
         room.messages.push({by:"老師",to:s.id,text:reason,type:"assist",at:Date.now()});
         if(s.socketId)io.to(s.socketId).emit("program:replace",{program:s.draft,reason});
@@ -306,7 +306,7 @@ export function createGameServer(options={}) {
       if(room.phase!=="tuning")return error(ack,"只有調校階段可重設學生積木");
       const s=room.students.find(v=>v&&v.id===data.playerId);
       if(!s)return error(ack,"找不到指定學生");
-      s.draft=defaultProgram();s.program=defaultProgram();s.ready=false;s.locked=false;s.lastError="";s.version++;s.modified=[];
+      s.draft=defaultProgram(room.topic);s.program=defaultProgram(room.topic);s.ready=false;s.locked=false;s.lastError="";s.version++;s.modified=[];
       if(s.socketId)io.to(s.socketId).emit("program:replace",{program:s.draft,reason:"老師已恢復預設程式"});
       okay(ack);notify(io,room);
     });
@@ -333,8 +333,8 @@ export function createGameServer(options={}) {
       notify(io,room);
     });
   });
-  function calculateModified(program) {
-    const base=defaultProgram(),out=[];
+  function calculateModified(program,topic="free") {
+    const base=defaultProgram(topic),out=[];
     const values=(source)=>{
       const map=new Map();
       function walk(body){

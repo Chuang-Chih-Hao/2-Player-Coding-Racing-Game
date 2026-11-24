@@ -4,13 +4,16 @@ import {io as connect} from "socket.io-client";
 import {createGameServer} from "../server/index.js";
 import {createCar,defaultProgram,execute,makeTrack,nearest,rescueCarToTrack,stepCar,finishIfNeeded,validateProgram} from "../server/core.js";
 
-test("safe interpreter validates input, nested conditions, and lesson restrictions",()=>{
+test("safe interpreter validates input and permits editing events in any lesson",()=>{
  const p=defaultProgram();
  assert.equal(validateProgram(p,"max").length,5);
  assert.throws(()=>validateProgram([{type:"event",event:"start",id:"e",body:[{type:"action",op:"run_js",id:"bad"}]}]),/尚未開放/);
  assert.throws(()=>validateProgram([{type:"event",event:"start",id:"e",body:[{type:"action",op:"set_max",value:99999,id:"bad"}]}]),/範圍/);
  const altered=structuredClone(p);altered[0].body[1].value=11;
- assert.throws(()=>validateProgram(altered,"max"),/只能修改/);
+ assert.equal(validateProgram(altered,"max")[0].body[1].value,11);
+ assert.equal(defaultProgram("max").length,1);
+ assert.equal(validateProgram([...defaultProgram("max"),{type:"event",id:"added",event:"pickup",body:[]}],"max").length,2);
+ assert.equal(validateProgram([],"max").length,0);
  assert.equal(validateProgram(altered,"accel")[0].body[1].value,11);
  assert.throws(()=>validateProgram([...p,...p],"free"),/重複/);
 });
@@ -149,4 +152,12 @@ test("Socket.IO two-player room, permissions, program locking, race, reconnect a
  assert.equal((await emit(rejoined,"student:test",{stop:true})).ok,true);
  const fake=await emit(outsider,"teacher:hint",{playerId:"p1",message:"x"});
  assert.equal(fake.ok,false);
+});
+
+test("student-created yellow events have real effects, and removing a rule removes the effect",()=>{
+ const track=makeTrack("rookie"),car=createCar("a","A",0,track,[]);
+ car.program=validateProgram([{type:"event",id:"when-pickup",event:"pickup",body:[{type:"action",id:"gain",op:"change_speed",value:20}]}],"max");
+ car.speed=70;execute(car,"pickup");assert.equal(car.speed,90);
+ car.program=[];execute(car,"pickup");assert.equal(car.speed,90);
+ car.item="nitro";execute(car,"key",{key:"Space"},1000);assert.ok(car.boostUntil>1000);
 });

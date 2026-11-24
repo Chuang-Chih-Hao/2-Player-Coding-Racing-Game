@@ -47,6 +47,9 @@
             <canvas id="raceCanvas" width="1000" height="686"></canvas>
             <div class="countdown" id="countdown" hidden>3</div>
             <div id="raceOverlay" class="race-overlay" hidden></div>
+            <div id="driveIntro" class="drive-intro" hidden><b>🏁 準備出發</b><p>沿箭頭方向跑完指定圈數！<br>先試駕，再調整程式提高速度。</p><button id="quickDrive" class="primary">▶ 開始試駕</button><small>↑ 加速　↓ 煞車　← → 轉向</small></div>
+            <div id="driveStatus" class="drive-status">維修站</div>
+            <div class="speed-cluster"><small>時速</small><div class="speed-track"><i id="speedMeter"></i></div><div id="driveTip">↑ 加速　↓ 煞車　← → 轉向　R 回賽道</div></div>
             <div class="race-hud">
               <div class="hud-pill"><small>圈數</small><b id="lapDisplay">—</b></div>
               <div class="hud-pill"><small>目前速度</small><b id="speedDisplay">0</b><small>km/h</small></div>
@@ -74,20 +77,21 @@
                 <span><i class="key-dot royal"></i>藍色＝如果／否則</span>
                 <span><i class="key-dot leaf"></i>綠色＝判斷條件</span>
               </div>
-              <span id="blockViewNote">沒有用到的黃色事件先收成一行，按「展開全部」可以看完整內容。</span>
+              <span id="blockViewNote">黃色事件可從左側拖入，也可以用下方新增／刪除。接入動作才會生效。</span>
               <div id="selectedBlockHelp" role="status" class="selected-block-help">點選任一個積木，這裡就會說明它會在何時、做什麼。</div>
             </div>
             <div class="editor-toolbar">
               <button id="undoButton" title="復原">↶ 復原</button><button id="redoButton" title="重做">↷ 重做</button>
-              <button id="arrangeButton" title="重新排列積木，避免重疊">整理積木</button><button id="allBlocksButton" title="顯示或收合其餘事件積木">展開全部</button><button id="resetButton">恢復預設</button><button id="clearButton">清空</button>
+              <button id="arrangeButton" title="重新排列積木，避免重疊">整理積木</button><button id="resetButton">恢復預設</button><button id="clearButton">清空</button>
               <button id="saveButton">儲存</button>
             </div>
+            <div class="event-editor"><select id="eventType" aria-label="選擇事件積木"></select><button id="addEventButton" class="event-add">＋ 新增事件</button><button id="deleteBlockButton" title="刪除目前選取的積木">刪除選取</button></div>
             <div id="blocklyDiv"></div>
             <div class="student-actions">
-              <button id="testButton" class="secondary">▶ 練習測試</button>
+              <button id="testButton" class="secondary">▶ 試駕</button>
               <button id="retryTestButton" class="secondary" hidden title="把練習回合從起點重來，保留程式">↻ 從起點重練</button>
-              <button id="stopTestButton" class="secondary" hidden>■ 停止測試</button>
-              <button id="lockButton" class="primary">✓ 鎖定積木 / 準備</button>
+              <button id="stopTestButton" class="secondary" hidden>■ 回調校</button>
+              <button id="lockButton" class="primary">✓ 準備比賽</button>
               <button id="unlockButton" class="secondary" hidden>修改積木</button>
               <button id="helpButton" class="warning" title="向老師發送求助通知，不會自動修改積木">🙋 舉手求助</button>
             </div>

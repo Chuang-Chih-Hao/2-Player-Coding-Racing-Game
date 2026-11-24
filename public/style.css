@@ -95,3 +95,12 @@ header{height:82px;background:#101d30;border-bottom:1px solid #30455d;display:fl
 .results-board section{background:#172f48;border:1px solid #4a7892;border-radius:12px;padding:14px;min-height:165px}
 .results-board h3{font-size:20px;margin:0 0 12px;color:#fff}
 .results-board p{font-size:14px;line-height:1.55;margin:6px 0;color:#cfe1f5}
+
+/* Arcade cockpit: clear driving objective, track direction and feedback. */
+.drive-intro{position:absolute;z-index:9;left:50%;top:49%;transform:translate(-50%,-50%);width:370px;background:#071926ee;border:1px solid #78e4ca;border-radius:20px;box-shadow:0 10px 38px #07101b88;padding:20px;text-align:center}
+.drive-intro b{font-size:25px;color:#f4fff9}.drive-intro p{font-size:15px;color:#c2d7dd;line-height:1.5;margin:8px 0 12px}.drive-intro button{display:block;width:100%;font-size:18px;padding:12px}.drive-intro small{display:block;margin-top:9px;color:#b7c9d7;font-size:13px}
+.drive-status{position:absolute;top:69px;left:15px;background:#0a1729e8;color:#baf6d8;padding:7px 12px;border-radius:8px;font-weight:800;font-size:14px;pointer-events:none}
+.speed-cluster{position:absolute;bottom:47px;left:15px;right:15px;display:flex;align-items:center;gap:10px;pointer-events:none}.speed-cluster small{font-weight:700;color:white}.speed-track{height:13px;width:180px;border:1px solid #c1deef;background:#14253c;border-radius:8px;overflow:hidden}.speed-track i{display:block;width:var(--speed,0%);height:100%;background:linear-gradient(90deg,#59e0b3,#f6ca50,#f27645)}
+#driveTip{padding:7px 12px;background:#0b1b2be8;border-radius:7px;color:#e3fff8;font-size:14px;font-weight:750}#driveTip.danger{background:#9c3527;color:white}#driveTip.item-ready{background:#6d4c17;color:#ffecae}
+.event-editor{display:flex;gap:7px;align-items:center;margin:0 0 6px;flex:none}.event-editor select{flex:1;min-width:0;padding:7px;font-size:12px}.event-editor button{font-size:12px;padding:7px}.event-add{background:#e9b443;color:#30260b;font-weight:800;border-color:#f1ca72}.event-add:hover{background:#f9ce72}
+.learning-guide{padding:6px 9px;gap:3px}.blocklyTreeLabel{color:#24364d!important;font-size:13px!important}

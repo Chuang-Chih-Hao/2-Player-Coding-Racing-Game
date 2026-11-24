@@ -66,7 +66,17 @@
           <div id="studentPanel" hidden>
             <div class="side-title"><div><span class="micro">SCRATCH CODING GARAGE</span><h2>賽車程式調校站</h2></div><div class="editor-title-actions"><span id="missionTag" class="chip">變數任務</span><button id="expandEditor" class="expand-editor" type="button" aria-pressed="false">⛶ 放大積木</button></div></div>
             <p class="mission" id="missionDescription">修改最高速度，看看車輛表現如何改變。</p>
-            <div class="learning-guide"><strong id="lessonGuide">找到「當比賽開始時」裡的速度積木，點白色數字修改。</strong><span id="blockViewNote">其他功能會收成短橘色積木，並沒有刪除，點一下可展開。</span></div>
+            <div class="learning-guide">
+              <strong id="lessonGuide">找到「當比賽開始時」裡的速度積木，點白色數字修改。</strong>
+              <div class="block-color-key" aria-label="積木顏色說明">
+                <span><i class="key-dot yellow"></i>黃色＝何時執行</span>
+                <span><i class="key-dot orange"></i>橘色＝設定數值</span>
+                <span><i class="key-dot royal"></i>藍色＝如果／否則</span>
+                <span><i class="key-dot leaf"></i>綠色＝判斷條件</span>
+              </div>
+              <span id="blockViewNote">沒有用到的黃色事件先收成一行，按「展開全部」可以看完整內容。</span>
+              <div id="selectedBlockHelp" role="status" class="selected-block-help">點選任一個積木，這裡就會說明它會在何時、做什麼。</div>
+            </div>
             <div class="editor-toolbar">
               <button id="undoButton" title="復原">↶ 復原</button><button id="redoButton" title="重做">↷ 重做</button>
               <button id="arrangeButton" title="重新排列積木，避免重疊">整理積木</button><button id="allBlocksButton" title="顯示或收合其餘事件積木">展開全部</button><button id="resetButton">恢復預設</button><button id="clearButton">清空</button>

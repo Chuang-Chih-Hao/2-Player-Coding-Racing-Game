@@ -35,7 +35,7 @@ test("three actual browser sessions: visual blocks, teacher monitoring, synchron
    return sampleMotion(q,1025).x;
  });
  expect(freshMotion).toBe(5);
- await expect(a.locator("#blockViewNote")).toContainText("短橘色積木");
+ await expect(a.locator("#blockViewNote")).toContainText("黃色事件");
  const compact=await a.evaluate(()=>{
   const panel=document.querySelector("#rightPanel").getBoundingClientRect();
   const help=document.querySelector("#helpButton").getBoundingClientRect();

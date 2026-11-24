@@ -630,49 +630,61 @@ function getTrack(which){
  return trackCache[which]={path,obstacles:ids.map((idx,i)=>({x:path[idx].x+(i%2?15:-18),y:path[idx].y+(i%2?15:-18)})),
    pickups:pickupIds.map((idx,i)=>({...path[idx],kind:Object.keys(itemLabels)[i%4]})),zones:zoneIds};
 }
-function drawTrack(which){
+function buildStaticTrack(which,paint){
  const {path,obstacles,pickups,zones}=getTrack(which);
- ctx.fillStyle="#143d37";ctx.fillRect(0,0,1000,686);
- ctx.save();
- ctx.globalAlpha=.28;
+ paint.fillStyle="#143d37";paint.fillRect(0,0,1000,686);
+ paint.save();
+ paint.globalAlpha=.28;
  for(let i=0;i<20;i++){
-   ctx.fillStyle=i%3===0?"#326d48":"#245647";
-   ctx.beginPath();ctx.arc((i*171+37)%995,(i*113+17)%684,20+i%5*8,0,Math.PI*2);ctx.fill();
+   paint.fillStyle=i%3===0?"#326d48":"#245647";
+   paint.beginPath();paint.arc((i*171+37)%995,(i*113+17)%684,20+i%5*8,0,Math.PI*2);paint.fill();
  }
- ctx.restore();
+ paint.restore();
  function stroke(width,color,dash=[]){
-  ctx.beginPath();path.forEach((p,i)=>i?ctx.lineTo(p.x,p.y):ctx.moveTo(p.x,p.y));ctx.closePath();
-  ctx.lineWidth=width;ctx.strokeStyle=color;ctx.lineJoin="round";ctx.setLineDash(dash);ctx.stroke();ctx.setLineDash([]);
+  paint.beginPath();path.forEach((p,i)=>i?paint.lineTo(p.x,p.y):paint.moveTo(p.x,p.y));paint.closePath();
+  paint.lineWidth=width;paint.strokeStyle=color;paint.lineJoin="round";paint.setLineDash(dash);paint.stroke();paint.setLineDash([]);
  }
  stroke(121,"#b1c1b0");stroke(111,"#344349");stroke(101,"#4b5961");stroke(3,"#d3dfc7",[15,23]);
- ctx.lineWidth=6;ctx.strokeStyle="#eebd60";ctx.beginPath();
+ paint.lineWidth=6;paint.strokeStyle="#eebd60";paint.beginPath();
  const z=path[0],q=path[1],ang=Math.atan2(q.y-z.y,q.x-z.x)+Math.PI/2;
- ctx.moveTo(z.x+Math.cos(ang)*53,z.y+Math.sin(ang)*53);
- ctx.lineTo(z.x-Math.cos(ang)*53,z.y-Math.sin(ang)*53);ctx.stroke();
- ctx.fillStyle="#e2eef7";ctx.font="bold 14px Arial";ctx.fillText("START",z.x+12,z.y-18);
+ paint.moveTo(z.x+Math.cos(ang)*53,z.y+Math.sin(ang)*53);
+ paint.lineTo(z.x-Math.cos(ang)*53,z.y-Math.sin(ang)*53);paint.stroke();
+ paint.fillStyle="#e2eef7";paint.font="bold 14px Arial";paint.fillText("START",z.x+12,z.y-18);
  for(const idx of zones){
    for(let k=0;k<11;k+=3){
      const p=path[(idx+k)%path.length];
-     ctx.strokeStyle="#58fad9";ctx.lineWidth=5;ctx.beginPath();
-     ctx.moveTo(p.x-7,p.y-6);ctx.lineTo(p.x+7,p.y+6);ctx.stroke();
+     paint.strokeStyle="#58fad9";paint.lineWidth=5;paint.beginPath();
+     paint.moveTo(p.x-7,p.y-6);paint.lineTo(p.x+7,p.y+6);paint.stroke();
    }
  }
  for(const o of obstacles){
-   ctx.fillStyle="#201e24";ctx.beginPath();ctx.ellipse(o.x,o.y+4,22,17,0,0,7);ctx.fill();
-   ctx.fillStyle="#f58b54";ctx.beginPath();ctx.arc(o.x,o.y,15,0,7);ctx.fill();
-   ctx.fillStyle="#fff0b3";ctx.fillRect(o.x-10,o.y-3,20,6);
+   paint.fillStyle="#201e24";paint.beginPath();paint.ellipse(o.x,o.y+4,22,17,0,0,7);paint.fill();
+   paint.fillStyle="#f58b54";paint.beginPath();paint.arc(o.x,o.y,15,0,7);paint.fill();
+   paint.fillStyle="#fff0b3";paint.fillRect(o.x-10,o.y-3,20,6);
  }
- for(const p of pickups){
-   ctx.save();ctx.translate(p.x,p.y);ctx.rotate(performance.now()/800);
-   ctx.fillStyle="#f9cc5b";ctx.shadowColor="#ffe589";ctx.shadowBlur=16;ctx.fillRect(-12,-12,24,24);ctx.restore();
+
+}
+const staticTrackLayers=new Map();
+function drawTrack(which,now=performance.now()){
+ let background=staticTrackLayers.get(which);
+ if(!background){
+   background=document.createElement("canvas");
+   background.width=canvas.width;background.height=canvas.height;
+   buildStaticTrack(which,background.getContext("2d"));
+   staticTrackLayers.set(which,background);
+ }
+ // The road geometry is painted once per track instead of every animation frame.
+ ctx.drawImage(background,0,0);
+ for(const p of getTrack(which).pickups){
+   ctx.save();ctx.translate(p.x,p.y);ctx.rotate(now/800);
+   const pulse=.96+.06*Math.sin(now/180+p.x);
+   ctx.scale(pulse,pulse);
+   ctx.fillStyle="#f9cc5b";ctx.shadowColor="#ffe589";ctx.shadowBlur=16;
+   ctx.fillRect(-12,-12,24,24);ctx.restore();
  }
 }
-function renderCar(car){
- const c=state.visual.get(car.id)||car;
- if(c.tx!==undefined){c.x+=(c.tx-c.x)*.22;c.y+=(c.ty-c.y)*.22;
-   const delta=Math.atan2(Math.sin(c.ta-c.angle),Math.cos(c.ta-c.angle));c.angle+=delta*.22;
-   Object.assign(c,{...c.other,x:c.x,y:c.y,angle:c.angle});
- }
+function renderCar(car,pose){
+ const c=pose?{...car,...pose}:car;
  const color=car.slot===0?"#53caff":"#ff79a1";
  ctx.save();ctx.translate(c.x,c.y);ctx.rotate(c.angle);
  if(c.boost){ctx.fillStyle="#ffcb5d";ctx.beginPath();ctx.moveTo(-21,0);ctx.lineTo(-56,-9);ctx.lineTo(-45,0);ctx.lineTo(-56,9);ctx.fill();}
@@ -697,17 +709,17 @@ function formatTime(n){
  return String(Math.floor(n/60)).padStart(2,"0")+":"+String(Math.floor(n%60)).padStart(2,"0")+"."+
   Math.floor((n%1)*10);
 }
-function animationFrame(){
+function animationFrame(frameTime){
  requestAnimationFrame(animationFrame);
  const r=state.room;
  if(!r)return;
- drawTrack(r.track);
+ drawTrack(r.track,frameTime);
  let cars=state.cars.length?state.cars:r.cars;
  if(state.role==="student"&&state.testing&&state.practice){
    cars=[...cars.filter(c=>c.id!==state.playerId),state.practice];
-   state.visual.set(state.playerId,{...state.practice});
  }
- for(const c of cars)renderCar(c);
+ const displayTime=Number.isFinite(state.clockOffset)?frameTime-state.clockOffset-RENDER_DELAY_MS:Date.now();
+ for(const c of cars)renderCar(c,sampleMotion(state.visual.get(c.id),displayTime));
  $("raceClock").textContent=formatTime(r.elapsed);
  if(r.phase==="countdown"||r.phase==="paused"&&r.countdownAt>Date.now()){
    $("countdown").hidden=false;

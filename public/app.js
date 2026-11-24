@@ -35,7 +35,7 @@ const eventMeanings={
 };
 function explainBlocklyBlock(block){
  if(!block)return "🟨 黃色積木是事件：發生指定情況才執行裡面的動作。";
- if(block.type.startsWith("event_"))return "🟨 事件｜"+eventMeanings[block.type.slice(6)]+(block.isCollapsed()?" 目前已收合；按上方「展開全部」查看裡面的指令。":"");
+ if(block.type.startsWith("event_"))return "🟨 事件｜"+eventMeanings[block.type.slice(6)]+(block.isCollapsed()?" 目前已收合；按「整理積木」可重新展開。":"");
  if(block.type.startsWith("act_")){
   const op=block.type.slice(4);
   if(op==="use_item")return "🟪 道具｜使用目前攜帶的道具；必須先撿到道具才有作用。";
@@ -286,7 +286,7 @@ function connectList(ws,list,head){
 }
 function arrangeBlocks(ws=state.workspace,topic=state.room?.topic||"free"){
  if(!ws)return;
- // Keep the learning target expanded; fold unrelated stock events.
+ // Expand and arrange real, editable event stacks without hiding any instructions.
  
  const order=Object.keys(eventLabels);
  const blocks=ws.getTopBlocks(false).sort((a,b)=>{
@@ -743,7 +743,7 @@ function animationFrame(frameTime){
  }
  const displayTime=Number.isFinite(state.clockOffset)?frameTime-state.clockOffset-RENDER_DELAY_MS:Date.now();
  for(const c of cars)renderCar(c,sampleMotion(state.visual.get(c.id),displayTime));
- $("raceClock").textContent=formatTime(state.testing?(performance.now()-(state.practiceStart||performance.now()))/1000:r.elapsed);
+ $("raceClock").textContent=formatTime(state.testing?(state.practice?.elapsed||0):r.elapsed);
  if(r.phase==="countdown"||r.phase==="paused"&&r.countdownAt>Date.now()){
    $("countdown").hidden=false;
    $("countdown").textContent=String(Math.max(1,Math.ceil((r.countdownAt-Date.now())/1000)));
@@ -763,9 +763,9 @@ function animationFrame(frameTime){
  const driving=state.role==="student"&&(state.testing||r.phase==="racing");
  $("driveIntro").hidden=state.role!=="student"||r.phase!=="tuning"||state.testing;
  $("quickDrive").disabled=state.ready;
- $("driveStatus").textContent=state.testing?"自由試駕｜練習跑完 "+r.laps+" 圈":r.phase==="racing"?"正式競速｜先完成 "+r.laps+" 圈獲勝":r.phase==="countdown"?"準備起跑":r.phase==="results"?"比賽結束":"維修站｜調整積木，準備試駕";
+ $("driveStatus").textContent=state.testing&&my?.finished?"🏁 試駕完成！ "+formatTime(my.finishedAt)+"｜可重練或回調校":state.testing?"自由試駕｜練習跑完 "+r.laps+" 圈":r.phase==="racing"?"正式競速｜先完成 "+r.laps+" 圈獲勝":r.phase==="countdown"?"準備起跑":r.phase==="results"?"比賽結束":"維修站｜調整積木，準備試駕";
  $("speedMeter").style.setProperty("--speed",Math.min(100,(my?.speed||0)/285*100)+"%");
- $("driveTip").textContent=driving&&my?.offroad?"離開跑道！按 R 立即回賽道":driving&&my?.item?"已獲得 "+itemLabels[my.item]+"｜空白鍵或你設定的按鍵":driving?(my?.curve?"彎道｜↓ 煞車，← → 轉向":"直線｜↑ 加速，← → 轉向"):"↑ 加速　↓ 煞車　← → 轉向　R 回賽道";
+ $("driveTip").textContent=state.testing&&my?.finished?"已完成所有圈數，按「從起點重練」或「回調校」":driving&&my?.offroad?"離開跑道！按 R 立即回賽道":driving&&my?.item?"已獲得 "+itemLabels[my.item]+"｜空白鍵或你設定的按鍵":driving?(my?.curve?"彎道｜↓ 煞車，← → 轉向":"直線｜↑ 加速，← → 轉向"):"↑ 加速　↓ 煞車　← → 轉向　R 回賽道";
  $("driveTip").classList.toggle("danger",!!(driving&&my?.offroad));
  $("driveTip").classList.toggle("item-ready",!!(driving&&my?.item&&!my?.offroad));
 }

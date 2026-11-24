@@ -247,7 +247,7 @@ export function createGameServer(options={}) {
       const now=Date.now();
       if(now-car.lastRescue<1500)return error(ack,"稍等一下再回賽道");
       rescueCarToTrack(car,makeTrack(room.track),now);
-      if(practice){if(s.socketId)io.to(s.socketId).emit("practice:update",simpleCar(car));}
+      if(practice){if(s.socketId)io.to(s.socketId).emit("practice:update",{...simpleCar(car),at:now,elapsed:car.practiceElapsed||0});}
       else io.to(room.code).emit("race:snapshot",{phase:room.phase,elapsed:room.elapsed,at:now,countdownAt:room.countdownAt,cars:room.cars.map(simpleCar)});
       okay(ack,{rescueCount:car.rescueCount});
     });
@@ -259,7 +259,7 @@ export function createGameServer(options={}) {
       try {
         const program=validateProgram(data.program,room.topic);
         const car=createCar(s.id,s.name,s.slot,makeTrack(room.track),program);
-        s.practice=car;execute(car,"start",{},Date.now(),entry=>trace(room,car,entry));
+        car.practiceElapsed=0;s.practice=car;execute(car,"start",{},Date.now(),entry=>trace(room,car,entry));
         okay(ack);notify(io,room);
       }catch(e){s.lastError=e.message;s.errors++;error(ack,e.message);notify(io,room);}
     });
@@ -383,8 +383,12 @@ export function createGameServer(options={}) {
         const track=makeTrack(room.track);
         room.students.forEach(s=>{
           if(!s?.practice)return;
-          stepCar(s.practice,track,dt,now,entry=>trace(room,s.practice,entry),room.difficulty);
-          if(s.socketId)io.to(s.socketId).emit("practice:update",{...simpleCar(s.practice),at:now});
+          if(!s.practice.finished){
+            s.practice.practiceElapsed=(s.practice.practiceElapsed||0)+dt;
+            stepCar(s.practice,track,dt,now,entry=>trace(room,s.practice,entry),room.difficulty);
+            if(finishIfNeeded(s.practice,room.laps,s.practice.practiceElapsed,now,entry=>trace(room,s.practice,entry)))s.practice.speed=0;
+          }
+          if(s.socketId)io.to(s.socketId).emit("practice:update",{...simpleCar(s.practice),at:now,elapsed:s.practice.practiceElapsed||0});
         });
       }
       if(["racing","paused","countdown"].includes(room.phase)){

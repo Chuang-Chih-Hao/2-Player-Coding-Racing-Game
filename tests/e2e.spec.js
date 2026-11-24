@@ -19,6 +19,22 @@ test("three actual browser sessions: visual blocks, teacher monitoring, synchron
  await expect(a.locator("#helpButton")).toBeVisible();
  await expect(a.locator("#feedbackPanel")).toBeVisible();
  await expect(a.locator("#lessonGuide")).toContainText("最高速度");
+ await expect(a.locator(".block-color-key")).toContainText("黃色＝何時執行");
+ await expect(a.locator(".block-color-key")).toContainText("藍色＝如果／否則");
+ const blockHelp=await a.evaluate(()=>{
+   const w=Blockly.getMainWorkspace(),event=w.getTopBlocks(false).find(x=>x.type==="event_start");
+   return {tooltip:event.getTooltip(),color:event.getColour(),
+    yellowEvents:w.getTopBlocks(false).filter(x=>x.type.startsWith("event_")).length};
+ });
+ expect(blockHelp.tooltip).toContain("賽車開始時");
+ expect(blockHelp.yellowEvents).toBeGreaterThan(2);
+ const freshMotion=await a.evaluate(async()=>{
+   const {pushMotion,sampleMotion}=await import("/motion.js");
+   let q=pushMotion([],{x:0,y:0,angle:0,speed:80},1000);
+   q=pushMotion(q,{x:10,y:0,angle:0,speed:80},1050);
+   return sampleMotion(q,1025).x;
+ });
+ expect(freshMotion).toBe(5);
  await expect(a.locator("#blockViewNote")).toContainText("短橘色積木");
  const compact=await a.evaluate(()=>{
   const panel=document.querySelector("#rightPanel").getBoundingClientRect();
@@ -103,6 +119,24 @@ test("three actual browser sessions: visual blocks, teacher monitoring, synchron
  await b.keyboard.down("ArrowUp");
  await expect.poll(async()=>Number((await a.locator("#speedDisplay").innerText()).trim())).toBeGreaterThan(0);
  await expect.poll(async()=>Number((await b.locator("#speedDisplay").innerText()).trim())).toBeGreaterThan(0);
+ // Server snapshots carry timestamps at ~20 Hz for client-side smooth interpolation.
+ const motionPackets=await a.evaluate(async()=>{
+   const socket=window.io({forceNew:true,transports:["websocket"]});
+   return await new Promise(resolve=>{
+     const received=[];let timer;
+     socket.on("race:snapshot",pkt=>{
+       received.push(pkt);
+       if(received.length>=3){
+         clearTimeout(timer);socket.disconnect();
+         resolve(received);
+       }
+     });
+     socket.on("connect",()=>socket.emit("room:join",{code:document.querySelector("#roomBadge").textContent.replace("房間 ",""),name:"motion observer"},()=>{}));
+     timer=setTimeout(()=>{socket.disconnect();resolve(received)},1000);
+   });
+ });
+ expect(motionPackets.length).toBeGreaterThanOrEqual(2);
+ expect(motionPackets.every(p=>Number.isFinite(p.at))).toBe(true);
  await expect(a.locator("#rescueButton")).toBeVisible();
  await a.locator("#rescueButton").click();
  await expect(a.locator("#toast")).toContainText("回賽道");

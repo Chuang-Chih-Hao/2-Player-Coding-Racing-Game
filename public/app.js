@@ -478,7 +478,7 @@ function updateRoom(){
  $("missionTag").textContent=(r.topic==="free"?"自由設計":r.topic==="curve"?"條件判斷":r.topic==="item"?"事件觸發":"變數任務");
  $("missionDescription").textContent=topicText[r.topic]||"";
  $("lessonGuide").textContent=lessonGuide[r.topic]||"";
- if(state.role==="student")$("selectedBlockHelp").textContent=state.workspace?explainBlocklyBlock(state.workspace.getSelected()):"🟨 黃色積木是事件：發生指定情況才執行裡面的動作。";
+ if(state.role==="student"&&!state.workspace?.getAllBlocks(false).length)$("selectedBlockHelp").textContent="🟨 黃色積木是事件：發生指定情況才執行裡面的動作。";
  if(state.role==="student"){
    const my=r.students.find(s=>s?.id===state.playerId);
    state.ready=!!my?.ready;

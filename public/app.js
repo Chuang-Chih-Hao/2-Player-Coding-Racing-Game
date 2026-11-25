@@ -3,18 +3,18 @@ import {RENDER_DELAY_MS,pushMotion,sampleMotion} from './motion.js';
 const $=id=>document.getElementById(id);
 const roomNames={rookie:"新手練習賽道",curves:"彎道技術賽道",items:"道具競速賽道"};
 const topicText={
- max:"挑戰：先改最高速度，再試駕並比較單圈時間。其他積木也可以自由編輯。",
- accel:"挑戰：調整加速度，比較起跑與過彎表現。也能自己添加事件。",
- curve:"調整「當進入彎道時」的 if / else 事件，讓賽車學會彎道減速。",
- item:"修改「當取得道具」或「當按下按鍵」的程式，決定道具何時使用。",
- free:"自由組合事件、變數與條件判斷，設計自己的賽車策略."
+ max:"先組裝能開動的賽車，再比較最高速度對單圈時間的影響。",
+ accel:"先組裝能開動的賽車，再比較不同加速度的起步表現。",
+ curve:"組裝車輛後，新增進／出彎事件及目標速度積木。",
+ item:"組裝車輛後，自行新增按鍵事件與「啟動目前的道具」。",
+ free:"從零組裝，並新增事件、條件與道具策略。"
 };
 const lessonGuide={
- max:"① 找到「當比賽開始時」 ② 點「將最高速度設為」的白色數字 ③ 練習測試",
- accel:"① 找到「當比賽開始時」 ② 點「將加速度設為」的白色數字 ③ 比較起步",
- curve:"① 找到「當進入彎道時」 ② 找「如果／否則」 ③ 調整過彎速度",
- item:"① 找「當按下空白鍵時」 ② 看「如果有道具」 ③ 練習啟動道具",
- free:"從左側分類拖入黃色事件，再接橘色動作；所有積木都可以增加或刪除。"
+ max:"拖入最高速度、加速度、轉向靈敏度、煞車強度，接在黃色起跑事件下。",
+ accel:"四項駕駛功能由積木解鎖；再調整加速度。",
+ curve:"四項功能組裝後，加入進／出彎事件及目標速度。",
+ item:"四項功能組裝後，新增指定按鍵事件，接入紫色道具積木。",
+ free:"四項基本功能必須自行接入；其他事件與動作自由設計。"
 };
 const opLabels={set_max:"最高速度",set_accel:"加速度",set_steer:"轉向靈敏度",set_brake:"煞車強度",set_target:"目標速度",change_speed:"速度改變"};
 const params={set_max:[70,230,150],set_accel:[3,16,8],set_steer:[1,6,3],set_brake:[2,12,5],set_target:[35,230,150],change_speed:[-40,40,10]};
@@ -23,14 +23,14 @@ const eventLabels={start:"當比賽開始時",line:"當通過起跑線時",curve
 const conditionLabels={curve:"目前在彎道",speed_gt:"速度大於",collision:"碰到障礙物",has_item:"有道具",obstacle_near:"距離障礙物小於",item_kind:"道具種類等於"};
 const itemLabels={nitro:"氮氣加速",shield:"防護盾",grip:"抓地力",jammer:"干擾器"};
 const eventMeanings={
- start:"賽車開始時執行一次下方指令。預設會設定最高速度、加速度、轉向與煞車。",
+ start:"賽車開始時執行下方指令。空事件不提供功能，必須自行接入四項橘色設定。",
  line:"完成一圈通過起跑線時才執行，適合設定每圈的變化。",
  curve_enter:"車子開進彎道時才執行，例如把「目標速度」調低，減少衝出彎道。",
- curve_leave:"離開彎道回到直線時執行，預設會把目標速度恢復為 230。",
+ curve_leave:"離開彎道回到直線時執行，可接上目標速度 230 恢復直線速度。",
  collision:"車子碰撞橘色路障時觸發，可以設定碰撞後要做的反應。",
- pickup:"碰到賽道上的黃色道具方塊時觸發；預設會播放提示音。",
- boost_zone:"經過賽道上的青色加速區時觸發。",
- key:"玩家按下這個積木指定的按鍵時才執行，預設空白鍵會嘗試使用道具。",
+ pickup:"碰到賽道上的黃色道具方塊時觸發；接入音效或道具動作才會執行。",
+ boost_zone:"經過青色區域時觸發；必須接入「將速度改變」才會加速。",
+ key:"玩家按下指定按鍵時才執行。接入紫色「啟動目前的道具」才能使用道具。",
  finish:"車子跑完設定圈數後執行一次。"
 };
 function explainBlocklyBlock(block){
@@ -200,7 +200,7 @@ function initBlockly(){
      return;
    }
    if(state.suppress||e.type===Blockly.Events.UI||e.isUiEvent)return;
-   clearTimeout(initBlockly.timer);
+   updateBuildChecklist();clearTimeout(initBlockly.timer);
    initBlockly.timer=setTimeout(sendDraft,430);
  });
 }
@@ -318,10 +318,11 @@ function loadProgram(program,ws=state.workspace){
  }catch(e){toast("重建積木遇到問題："+e.message);}
  finally{Blockly.Events.enable();if(ws===state.workspace)state.suppress=false;}
  Blockly.svgResize(ws);
- if(ws===state.workspace)state.lastProgramStr=JSON.stringify(program||[]);
+ if(ws===state.workspace){state.lastProgramStr=JSON.stringify(program||[]);updateBuildChecklist();}
 }
 async function sendDraft(){
  if(!state.workspace||!state.room||state.role!=="student"||state.ready||!["tuning","results"].includes(state.room.phase))return;
+ updateBuildChecklist();
  try{
    const program=programAst(),json=JSON.stringify(program);
    if(json===state.lastProgramStr)return;
@@ -330,27 +331,20 @@ async function sendDraft(){
    else explain("積木組合需要修正："+state.lastServerError);
  }catch(e){explain(e.message);}
 }
-function defaultProgram(topic=state.room?.topic||"free"){
- const all=[
-  {type:"event",event:"start",body:[
-   {type:"action",op:"set_max",value:150},
-   {type:"action",op:"set_accel",value:8},
-   {type:"action",op:"set_steer",value:3},
-   {type:"action",op:"set_brake",value:5},
-   {type:"action",op:"set_target",value:230}
-  ]},
-  {type:"event",event:"curve_enter",body:[{type:"if",condition:{type:"condition",kind:"curve"},
-    then:[{type:"action",op:"set_target",value:75}],else:[{type:"action",op:"set_target",value:145}]}]},
-  {type:"event",event:"curve_leave",body:[{type:"action",op:"set_target",value:230}]} ,
-  {type:"event",event:"key",key:"Space",body:[{type:"if",condition:{type:"condition",kind:"has_item"},
-    then:[{type:"action",op:"use_item"}],else:[]}]},
-  {type:"event",event:"pickup",body:[{type:"action",op:"play_sound"}]}
- ];
- if(topic==="free")return all;
- const start=all[0];start.body=start.body.slice(0,2);
- if(topic==="curve")return [start,all[1],all[2]];
- if(topic==="item")return [start,all[3],all[4]];
- return [start];
+function defaultProgram(){return [{type:"event",event:"start",body:[]}];}
+const requiredDrive=[["set_max","最高速度"],["set_accel","加速度"],["set_steer","轉向"],["set_brake","煞車"]];
+function updateBuildChecklist(){
+ if(!state.workspace||state.role!=="student")return;
+ const program=programAstSafe();
+ const connected=new Set((program||[]).filter(e=>e.event==="start").flatMap(e=>e.body.filter(n=>n.type==="action").map(n=>n.op)));
+ const done=requiredDrive.filter(([op])=>connected.has(op)).length;
+ $("buildCount").textContent=done+"/4";
+ for(const [op] of requiredDrive){
+   const el=$("req-"+op),ok=connected.has(op);
+   el.classList.toggle("built",ok);
+   el.textContent=(ok?"✓ ":"○ ")+requiredDrive.find(x=>x[0]===op)[1];
+ }
+ $("buildMessage").textContent=!program?"請把所有動作接進事件，移除孤立積木":done===4?"四項功能已接好！可試駕或準備比賽。":"從左側「變數」拖入橘色積木，接到黃色起跑事件內。";
 }
 function storeProgram(){
  try{const p=programAst();localStorage.setItem("coding-racing-program-"+state.code,JSON.stringify(p));toast("程式已儲存在本機，並可提交給老師");sendDraft();}
@@ -375,7 +369,7 @@ $("deleteBlockButton").onclick=()=>{
  if(!block){toast("先點選想刪除的積木");return;}
  block.dispose(true);state.selectedBlockId=null;arrangeBlocks(w);sendDraft();toast("已刪除選取積木");
 };
-$("resetButton").onclick=()=>{loadProgram(defaultProgram());sendDraft();toast("已恢復預設積木，沒有重設正式比賽");};
+$("resetButton").onclick=()=>{loadProgram(defaultProgram());state.lastProgramStr="";sendDraft();toast("已回到空白起跑事件，請自行組裝功能");};
 function toggleEditor(force){
  const expanded=force??!$("stage").classList.contains("editor-focus");
  $("stage").classList.toggle("editor-focus",expanded);
@@ -398,7 +392,7 @@ $("unlockButton").onclick=async()=>{if(await call("program:unlock")){state.ready
 async function startPractice(retry=false){
  try{const program=programAst();if(await call("student:test",{program})){
     state.testing=true;state.practice=null;state.practiceStart=performance.now();state.visual.delete(state.playerId);
-    toast(retry?"已回到起點，重新開始練習":"練習開始！使用方向鍵駕駛");
+    toast(retry?"已回到起點，重新開始練習":"功能測試開始！未安裝的功能不會作用");
     $("retryTestButton").hidden=false;$("stopTestButton").hidden=false;$("testButton").hidden=true;
  }}catch(e){toast(e.message);}
 }
@@ -491,6 +485,7 @@ function updateRoom(){
  $("missionTag").textContent=(r.topic==="free"?"自由設計":r.topic==="curve"?"條件判斷":r.topic==="item"?"事件觸發":"變數任務");
  $("missionDescription").textContent=topicText[r.topic]||"";
  $("lessonGuide").textContent=lessonGuide[r.topic]||"";
+ updateBuildChecklist();
  if(state.role==="student"&&!state.workspace?.getAllBlocks(false).length)$("selectedBlockHelp").textContent="🟨 黃色積木是事件：發生指定情況才執行裡面的動作。";
  if(state.role==="student"){
    const my=r.students.find(s=>s?.id===state.playerId);
@@ -765,7 +760,8 @@ function animationFrame(frameTime){
  $("quickDrive").disabled=state.ready;
  $("driveStatus").textContent=state.testing&&my?.finished?"🏁 試駕完成！ "+formatTime(my.finishedAt)+"｜可重練或回調校":state.testing?"自由試駕｜練習跑完 "+r.laps+" 圈":r.phase==="racing"?"正式競速｜先完成 "+r.laps+" 圈獲勝":r.phase==="countdown"?"準備起跑":r.phase==="results"?"比賽結束":"維修站｜調整積木，準備試駕";
  $("speedMeter").style.setProperty("--speed",Math.min(100,(my?.speed||0)/285*100)+"%");
- $("driveTip").textContent=state.testing&&my?.finished?"已完成所有圈數，按「從起點重練」或「回調校」":driving&&my?.offroad?"離開跑道！按 R 立即回賽道":driving&&my?.item?"已獲得 "+itemLabels[my.item]+"｜空白鍵或你設定的按鍵":driving?(my?.curve?"彎道｜↓ 煞車，← → 轉向":"直線｜↑ 加速，← → 轉向"):"↑ 加速　↓ 煞車　← → 轉向　R 回賽道";
+ const missingRuntime=my?.tuning?requiredDrive.filter(([op])=>!my.tuning[({set_max:"max",set_accel:"accel",set_steer:"steer",set_brake:"brake"})[op]]).map(([,label])=>label):[];
+ $("driveTip").textContent=driving&&missingRuntime.length?"尚未啟用："+missingRuntime.join("、")+"｜回調校補積木":state.testing&&my?.finished?"已完成所有圈數，按「從起點重練」或「回調校」":driving&&my?.offroad?"離開跑道！按 R 立即回賽道":driving&&my?.item?"已獲得 "+itemLabels[my.item]+"｜需連接按鍵事件及道具積木":driving?(my?.curve?"彎道｜↓ 煞車，← → 轉向":"直線｜↑ 加速，← → 轉向"):"↑ 加速　↓ 煞車　← → 轉向　R 回賽道";
  $("driveTip").classList.toggle("danger",!!(driving&&my?.offroad));
  $("driveTip").classList.toggle("item-ready",!!(driving&&my?.item&&!my?.offroad));
 }

@@ -2,10 +2,19 @@ import test from "node:test";
 import assert from "node:assert/strict";
 import {io as connect} from "socket.io-client";
 import {createGameServer} from "../server/index.js";
-import {createCar,defaultProgram,execute,makeTrack,nearest,rescueCarToTrack,stepCar,finishIfNeeded,validateProgram} from "../server/core.js";
+import {createCar,defaultProgram,execute,makeTrack,missingDriveBlocks,nearest,rescueCarToTrack,stepCar,finishIfNeeded,validateProgram} from "../server/core.js";
+
+function builtProgram(){
+ const act=(op,value,id)=>({type:"action",op,value,id});
+ return [{type:"event",event:"start",id:"default-start",body:[act("set_max",150,"max"),act("set_accel",8,"accel"),act("set_steer",3,"steer"),act("set_brake",5,"brake"),act("set_target",230,"target")]},
+ {type:"event",event:"curve_enter",id:"curve",body:[act("set_target",75,"curve-target")]},
+ {type:"event",event:"curve_leave",id:"leave",body:[act("set_target",230,"leave-target")]},
+ {type:"event",event:"key",key:"Space",id:"key",body:[{type:"action",op:"use_item",id:"use"}]},
+ {type:"event",event:"pickup",id:"pickup",body:[{type:"action",op:"play_sound",id:"sound"}]}];
+}
 
 test("safe interpreter validates input and permits editing events in any lesson",()=>{
- const p=defaultProgram();
+ const p=builtProgram();
  assert.equal(validateProgram(p,"max").length,5);
  assert.throws(()=>validateProgram([{type:"event",event:"start",id:"e",body:[{type:"action",op:"run_js",id:"bad"}]}]),/尚未開放/);
  assert.throws(()=>validateProgram([{type:"event",event:"start",id:"e",body:[{type:"action",op:"set_max",value:99999,id:"bad"}]}]),/範圍/);
@@ -18,7 +27,7 @@ test("safe interpreter validates input and permits editing events in any lesson"
  assert.throws(()=>validateProgram([...p,...p],"free"),/重複/);
 });
 test("real car dynamics respond to Scratch blocks and conditions",()=>{
- const track=makeTrack("rookie"),p1=defaultProgram(),p2=defaultProgram();
+ const track=makeTrack("rookie"),p1=builtProgram(),p2=builtProgram();
  p1[0].body[0].value=210;p2[0].body[0].value=95;
  const a=createCar("a","A",0,track,p1),b=createCar("b","B",1,track,p2);
  execute(a,"start");execute(b,"start");
@@ -41,7 +50,7 @@ test("real car dynamics respond to Scratch blocks and conditions",()=>{
  assert.ok(a.events>=3);assert.ok(a.trace.length>0);
 });
 test("a simulated keyboard driver can drive a real checkpointed lap",()=>{
- const track=makeTrack("rookie"),car=createCar("lap","Lap driver",0,track);
+ const track=makeTrack("rookie"),car=createCar("lap","Lap driver",0,track,builtProgram());
  execute(car,"start",{},Date.now());
  let now=Date.now(),steps=0;
  for(;steps<2400&&car.laps<1;steps++){
@@ -59,8 +68,8 @@ test("a simulated keyboard driver can drive a real checkpointed lap",()=>{
  console.log("模擬完整一圈：秒數="+(steps*.05).toFixed(1)+"，極速="+Math.round(car.peak)+"，碰撞="+car.collisions);
 });
 test("repeated road rescues keep progress, avoid obstacles, and restore steering",()=>{
- const track=makeTrack("rookie"),car=createCar("stranded","Stranded",0,track);
- const now=Date.now();
+ const track=makeTrack("rookie"),car=createCar("stranded","Stranded",0,track,builtProgram());
+ const now=Date.now();execute(car,"start",{},now);
  car.laps=1;car.checkpoint=true;car.progress=180;car.x=500;car.y=343;car.speed=0;
  assert.equal(rescueCarToTrack(car,track,now),true);
  assert.equal(car.laps,1);assert.equal(car.checkpoint,true);
@@ -101,7 +110,8 @@ test("Socket.IO two-player room, permissions, program locking, race, reconnect a
  assert.equal((await emit(outsider,"student:rescue")).ok,false);
  assert.equal((await emit(studentA,"student:rescue")).ok,false);
  const update=await emit(teacher,"teacher:set",{topic:"max",track:"rookie",laps:1});assert.equal(update.ok,true);
- const p1=defaultProgram(),p2=defaultProgram();p1[0].body[0].value=175;p2[0].body[0].value=90;
+ const p1=builtProgram(),p2=builtProgram();p1[0].body[0].value=175;p2[0].body[0].value=90;
+ assert.equal((await emit(studentA,"program:lock",{program:defaultProgram()})).ok,false);
  assert.equal((await emit(studentA,"program:draft",{program:p1})).ok,true);
  assert.equal((await emit(studentB,"program:draft",{program:p2})).ok,true);
  assert.equal((await emit(studentA,"program:lock",{program:p1})).ok,true);
@@ -156,8 +166,28 @@ test("Socket.IO two-player room, permissions, program locking, race, reconnect a
 
 test("student-created yellow events have real effects, and removing a rule removes the effect",()=>{
  const track=makeTrack("rookie"),car=createCar("a","A",0,track,[]);
- car.program=validateProgram([{type:"event",id:"when-pickup",event:"pickup",body:[{type:"action",id:"gain",op:"change_speed",value:20}]}],"max");
+ car.program=validateProgram([...builtProgram().slice(0,1),{type:"event",id:"when-pickup",event:"pickup",body:[{type:"action",id:"gain",op:"change_speed",value:20}]}],"max");execute(car,"start");
  car.speed=70;execute(car,"pickup");assert.equal(car.speed,90);
  car.program=[];execute(car,"pickup");assert.equal(car.speed,90);
- car.item="nitro";execute(car,"key",{key:"Space"},1000);assert.ok(car.boostUntil>1000);
+ car.item="nitro";execute(car,"key",{key:"Space"},1000);assert.equal(car.boostUntil,0);assert.equal(car.item,"nitro");
+});
+
+test("empty and disconnected functions cannot drive; connected blocks individually enable controls",()=>{
+ const track=makeTrack("rookie"),now=Date.now(),blank=createCar("blank","Blank",0,track,defaultProgram());
+ execute(blank,"start");blank.input={up:true,down:true,left:false,right:true};
+ const x=blank.x,y=blank.y,angle=blank.angle;
+ for(let i=0;i<30;i++)stepCar(blank,track,.05,now+i*50,()=>{},1);
+ assert.equal(blank.speed,0);assert.equal(blank.x,x);assert.equal(blank.y,y);assert.equal(blank.angle,angle);
+ assert.equal(missingDriveBlocks(defaultProgram()).length,4);
+ rescueCarToTrack(blank,track,now);assert.equal(blank.speed,0);
+ const p=builtProgram();p[0].body=p[0].body.filter(n=>n.op==="set_max"||n.op==="set_accel");
+ const partial=createCar("partial","Partial",0,track,p);execute(partial,"start");
+ partial.input={up:true,down:false,left:false,right:true};const heading=partial.angle;
+ for(let i=0;i<20;i++)stepCar(partial,track,.05,now+i*50,()=>{},1);
+ assert.ok(partial.speed>0);assert.equal(partial.angle,heading);assert.equal(partial.tuning.brake,0);
+ assert.equal(missingDriveBlocks(p).length,2);
+ const full=createCar("full","Full",0,track,builtProgram());execute(full,"start");
+ assert.equal(missingDriveBlocks(full.program).length,0);full.speed=60;full.input={up:false,down:true,left:false,right:true};
+ const initial=full.angle;stepCar(full,track,.05,now,()=>{},1);assert.ok(full.speed<60-19*.05);assert.notEqual(full.angle,initial);
+ full.item="nitro";execute(full,"key",{key:"Space"},now);assert.ok(full.boostUntil>now);
 });

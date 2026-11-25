@@ -5,7 +5,7 @@ import {Server} from "socket.io";
 import {fileURLToPath} from "node:url";
 import path from "node:path";
 import {ACTIONS,PARAMS,TOPICS,TRACKS,clamp,createCar,defaultProgram,
-  execute,finishIfNeeded,makeTrack,rescueCarToTrack,simpleCar,stepCar,validateProgram} from "./core.js";
+  execute,finishIfNeeded,makeTrack,missingDriveBlocks,rescueCarToTrack,simpleCar,stepCar,validateProgram} from "./core.js";
 
 const secret=()=>randomBytes(24).toString("hex");
 const roomCode=()=>randomBytes(3).toString("hex").toUpperCase();
@@ -186,6 +186,8 @@ export function createGameServer(options={}) {
       if(room.phase!=="tuning")return error(ack,"目前不是程式調校階段");
       try {
         const validated=validateProgram(data.program,room.topic);
+        const missing=missingDriveBlocks(validated);
+        if(missing.length)return error(ack,"請先在「當比賽開始時」直接接入："+missing.join("、"));
         s.draft=validated;s.program=clone(validated);s.locked=true;s.ready=true;
         s.attempts++;s.modified=calculateModified(validated,room.topic);s.version++;
         okay(ack,{ready:true});notify(io,room);
@@ -292,7 +294,7 @@ export function createGameServer(options={}) {
       let done=false;
       function edit(arr){for(const n of arr){if(n.type==="action"&&n.op===data.op&&!done){n.value=value;done=true;}if(n.type==="if"){edit(n.then);edit(n.else);}}}
       candidate.forEach(e=>edit(e.body));
-      if(!done)return error(ack,"學生尚未放置這個數值積木");
+      if(!done)return error(ack,"學生尚未放置這個數值積木，請先引導學生自行拖入");
       try{s.draft=validateProgram(candidate,room.topic);s.locked=false;s.ready=false;
         s.version++;s.modified=calculateModified(s.draft,room.topic);
         const reason="老師協助修改了 " + data.op + " → " + value;
@@ -348,10 +350,10 @@ export function createGameServer(options={}) {
     };
     const before=values(base),after=values(program);
     for(const [op,value] of after){
-      if(before.has(op)&&before.get(op)!==value){
+      if(!before.has(op)||before.get(op)!==value){
         const label={set_max:"最高速度",set_accel:"加速度",set_steer:"轉向靈敏度",
           set_brake:"煞車強度",set_target:"目標速度",change_speed:"速度"}[op]||op;
-        out.push(label+": "+before.get(op)+" → "+value);
+        out.push(label+": "+(before.has(op)?before.get(op)+" → ":"新增 ")+value);
       }
     }
     const canonical=x=>JSON.stringify(x,(key,value)=>key==="id"?undefined:value);

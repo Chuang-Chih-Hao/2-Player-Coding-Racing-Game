@@ -14,37 +14,16 @@ export const ACTIONS = [...Object.keys(PARAMS), "use_item", "play_sound"];
 export const ITEMS = ["nitro", "shield", "grip", "jammer"];
 export const clamp = (n, a, b) => Math.min(b, Math.max(a, n));
 
+export const REQUIRED_DRIVE = [
+  ["set_max","最高速度"],["set_accel","加速度"],["set_steer","轉向靈敏度"],["set_brake","煞車強度"]
+];
+// The yellow hat is only a scaffold. It does not enable any functions.
 export function defaultProgram(topic="free") {
-  const all=[
-    {type:"event",event:"start",id:"default-start",body:[
-      {type:"action",op:"set_max",value:150,id:"default-max"},
-      {type:"action",op:"set_accel",value:8,id:"default-accel"},
-      {type:"action",op:"set_steer",value:3,id:"default-steer"},
-      {type:"action",op:"set_brake",value:5,id:"default-brake"},
-      {type:"action",op:"set_target",value:230,id:"default-target"}
-    ]},
-    {type:"event",event:"curve_enter",id:"default-curve",body:[
-      {type:"if",id:"default-if",condition:{type:"condition",kind:"curve",id:"default-cond"},then:[
-        {type:"action",op:"set_target",value:75,id:"default-curve-target"}
-      ],else:[{type:"action",op:"set_target",value:145,id:"default-curve-else"}]}
-    ]},
-    {type:"event",event:"curve_leave",id:"default-leave",body:[
-      {type:"action",op:"set_target",value:230,id:"default-leave-target"}
-    ]},
-    {type:"event",event:"key",key:"Space",id:"default-key",body:[
-      {type:"if",id:"default-item-if",condition:{type:"condition",kind:"has_item",id:"default-has-item"},
-        then:[{type:"action",op:"use_item",id:"default-use-item"}],else:[]}
-    ]},
-    {type:"event",event:"pickup",id:"default-pickup",body:[
-      {type:"action",op:"play_sound",id:"default-sound"}
-    ]}
-  ];
-  if(topic==="free")return all;
-  const start=all[0];
-  start.body=start.body.filter(n=>n.op==="set_max"||n.op==="set_accel");
-  if(topic==="curve")return [start,all[1],all[2]];
-  if(topic==="item")return [start,all[3],all[4]];
-  return [start];
+  return [{type:"event",event:"start",id:"default-start",body:[]}];
+}
+export function missingDriveBlocks(program) {
+  const connected=new Set((program||[]).filter(e=>e.event==="start").flatMap(e=>(e.body||[]).filter(n=>n.type==="action").map(n=>n.op)));
+  return REQUIRED_DRIVE.filter(([op])=>!connected.has(op)).map(([,label])=>label);
 }
 function fail(message) { throw new Error(message); }
 export function validateProgram(source, topic="free") {
@@ -129,7 +108,7 @@ export function rescueCarToTrack(c,track,now=Date.now()) {
   }
   const p=track.path[idx],q=track.path[(idx+3)%N];
   c.x=p.x;c.y=p.y;c.progress=idx;c.angle=Math.atan2(q.y-p.y,q.x-p.x);
-  c.speed=35;c.offroad=false;c.curve=isCurve(track,idx);
+  c.speed=c.tuning.max>0&&c.tuning.accel>0?Math.min(35,c.tuning.max,c.tuning.target):0;c.offroad=false;c.curve=isCurve(track,idx);
   c.lastRescue=now;c.rescueShieldUntil=now+1800;c.rescueCount=(c.rescueCount||0)+1;
   c.lastDiagnostic="已回到賽道！按 ↑ / W 加速，方向鍵轉彎";
   return true;
@@ -151,7 +130,7 @@ export function createCar(id,name,slot,track,program=defaultProgram()) {
     item:null,itemCount:0,lastHit:0,picked:new Set(),zoneInside:false,
      rescueCount:0,lastRescue:0,rescueShieldUntil:0,
     input:{up:false,down:false,left:false,right:false},program,
-    tuning:{max:150,accel:8,steer:3,brake:5,target:230},
+    tuning:{max:0,accel:0,steer:0,brake:0,target:230},
     trace:[],logs:[],lastDiagnostic:"", help:false
   };
 }
@@ -167,8 +146,7 @@ export function simpleCar(c) {
 }
 export function execute(c,event,ctx={},now=Date.now(),emit=()=>{}) {
   const matched=c.program.filter(e=>e.event===event && (event!=="key"||e.key===ctx.key));
-  if(event==="key"&&ctx.key==="Space"&&!c.program.some(e=>e.event==="key")&&c.item)
-    matched.push({id:"builtin-space",body:[{id:"builtin-item",type:"action",op:"use_item"}]});
+
   for(const evt of matched) {
     let steps=0;
     function log(n,message) {
@@ -197,7 +175,7 @@ export function execute(c,event,ctx={},now=Date.now(),emit=()=>{}) {
           if(node.op==="set_steer")c.tuning.steer=node.value;
           if(node.op==="set_brake")c.tuning.brake=node.value;
           if(node.op==="set_target")c.tuning.target=node.value;
-          if(node.op==="change_speed")c.speed=clamp(c.speed+node.value,0,c.tuning.max);
+          if(node.op==="change_speed"&&c.tuning.max>0&&c.tuning.accel>0)c.speed=clamp(c.speed+node.value,0,c.tuning.max);
           if(node.op==="use_item" && c.item) {
             const used=c.item;c.item=null;c.itemCount=0;
             if(used==="nitro")c.boostUntil=now+3200;
@@ -216,18 +194,19 @@ export function stepCar(c,track,dt,now,emit=()=>{},difficulty=2) {
   if(c.finished)return;
   const near0=nearest(track,c.x,c.y);
   const nearObstacle=Math.min(...track.obstacles.map(o=>Math.hypot(o.x-c.x,o.y-c.y)),999);
-  if(c.input.up) c.speed+=c.tuning.accel*4.2*dt;
+  const powered=c.tuning.max>0&&c.tuning.accel>0;
+  if(c.input.up&&powered) c.speed+=c.tuning.accel*4.2*dt;
   else c.speed-=19*dt;
   if(c.input.down)c.speed-=c.tuning.brake*13*dt;
   const boosted=c.boostUntil>now;
   const gripped=c.gripUntil>now;
   const jammed=c.jammedUntil>now;
-  const max= Math.min(c.tuning.max,c.tuning.target)+(boosted?55:0);
-  c.speed=clamp(c.speed,0,Math.max(35,max));
+  const max= powered?Math.min(c.tuning.max,c.tuning.target)+(boosted?55:0):0;
+  c.speed=clamp(c.speed,0,max);
   const turn=(Number(c.input.right)-Number(c.input.left));
   c.angle+=turn*c.tuning.steer*.57*dt*(.35+.65*Math.min(1,c.speed/110))*(jammed?.55:1);
   // Beginner steering assist yields immediately to manual steering.
-  if(difficulty===1&&turn===0&&c.speed>12&&!jammed&&near0.distance>track.width*.29&&near0.distance<track.width*.95){
+  if(difficulty===1&&c.tuning.steer>0&&turn===0&&c.speed>12&&!jammed&&near0.distance>track.width*.29&&near0.distance<track.width*.95){
     const ahead=track.path[(near0.idx+10)%track.path.length];
     const desired=Math.atan2(ahead.y-c.y,ahead.x-c.x);
     const delta=Math.atan2(Math.sin(desired-c.angle),Math.cos(desired-c.angle));
@@ -261,7 +240,7 @@ export function stepCar(c,track,dt,now,emit=()=>{},difficulty=2) {
   });
   if(c.picked.size===track.pickups.length)c.picked.clear();
   const zone=track.zones.some(z=>Math.abs(near.idx-z.idx)<z.length);
-  if(zone&&!c.zoneInside){c.zoneInside=true;c.speed=Math.min(c.tuning.max+25,c.speed+22);execute(c,"boost_zone",{},now,emit);}
+  if(zone&&!c.zoneInside){c.zoneInside=true;execute(c,"boost_zone",{},now,emit);}
   if(!zone)c.zoneInside=false;
   if(near.idx>155 && near.idx<205)c.checkpoint=true;
   const crossed=c.progress<22 && near0.idx>track.path.length-25;

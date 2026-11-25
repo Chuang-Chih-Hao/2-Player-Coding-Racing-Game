@@ -28,6 +28,15 @@ test("three actual browser sessions: visual blocks, teacher monitoring, synchron
  });
  expect(blockHelp.tooltip).toContain("賽車開始時");
  expect(blockHelp.yellowEvents).toBe(1);
+ await expect(a.locator("#buildCount")).toHaveText("0/4");
+ await a.locator("#quickDrive").click();
+ await expect(a.locator("#retryTestButton")).toBeVisible();
+ await a.keyboard.down("ArrowUp");await a.waitForTimeout(400);await a.keyboard.up("ArrowUp");
+ await expect(a.locator("#speedDisplay")).toHaveText("0");
+ await expect(a.locator("#driveTip")).toContainText("尚未啟用");
+ await a.locator("#stopTestButton").click();
+ await a.locator("#lockButton").click();
+ await expect(a.locator("#toast")).toContainText("請先");
  const freshMotion=await a.evaluate(async()=>{
    const {pushMotion,sampleMotion}=await import("/motion.js");
    let q=pushMotion([],{x:0,y:0,angle:0,speed:80},1000);
@@ -67,13 +76,18 @@ test("three actual browser sessions: visual blocks, teacher monitoring, synchron
  await t.locator("#topicSelect").selectOption("free");
  await t.locator("#applySettings").click();
  await expect(a.locator("#missionTag")).toHaveText("自由設計");
- const blockCount=await a.evaluate(()=>Blockly.getMainWorkspace().getAllBlocks(false).length);
- expect(blockCount).toBeGreaterThan(10);
- await a.evaluate(()=>{
-  const w=Blockly.getMainWorkspace(),block=w.getAllBlocks(false).find(b=>b.type==="act_set_max");
-  block.setFieldValue("198","VALUE");
+ const build=async page=>page.evaluate(()=>{
+  const w=Blockly.getMainWorkspace(),hat=w.getTopBlocks(false).find(b=>b.type==="event_start");
+  let connection=hat.getInput("BODY").connection;
+  for(const [type,value] of [["act_set_max",198],["act_set_accel",8],["act_set_steer",3],["act_set_brake",5]]){
+    const b=w.newBlock(type);b.initSvg();b.setFieldValue(String(value),"VALUE");b.render();
+    connection.connect(b.previousConnection);connection=b.nextConnection;
+  }
  });
+ await build(a);await build(b);
+ await expect(a.locator("#buildCount")).toHaveText("4/4");
  await expect(t.locator("#studentDetails")).toContainText("最高速度");
+ const blockCount=await a.evaluate(()=>Blockly.getMainWorkspace().getAllBlocks(false).length);
  const scaled=await a.evaluate(()=>{
   const stage=document.querySelector("#stage").getBoundingClientRect();
   const left=document.querySelector("#trackPanel").getBoundingClientRect();
@@ -97,7 +111,8 @@ test("three actual browser sessions: visual blocks, teacher monitoring, synchron
  expect(await a.evaluate(()=>Blockly.getMainWorkspace().getAllBlocks(false).length)).toBeGreaterThanOrEqual(blockCount);
  // A loose block must be connected or deleted before committing. Restore defaults and adjust the one target.
  await a.locator("#resetButton").click();
- await a.evaluate(()=>Blockly.getMainWorkspace().getAllBlocks(false).find(b=>b.type==="act_set_max").setFieldValue("198","VALUE"));
+ await build(a);
+ await expect(a.locator("#buildCount")).toHaveText("4/4");
  await a.locator("#testButton").click();
  await expect(a.locator("#retryTestButton")).toBeVisible();
  await expect(a.locator("#rescueButton")).toBeVisible();
